@@ -1,0 +1,403 @@
+name: hive
+help: A single-pane toolbox for Docker Swarm
+version: 0.0.1
+
+environment_variables:
+- name: DEBUG
+  help: Enable debug printing
+  default: "0"
+
+commands:
+- name: config
+  help: Manage hive settings and behaviors
+  commands:
+  - name: init
+    help: Run the initial setup prompts retaining current settings as defaults
+  - name: reload
+    help: Re-read local settings and re-execute necessary local configurations. Useful if you copied settings file between systems
+    flags:
+    - long: --file
+      short: -f
+      arg: FILE
+      help: Optional path to settings file. If pointed to a non-default location, settings will be copied to the default $HOME/.hive-settings.ini
+      default: $HOME/.hive-settings.ini
+      validate: file_exists
+  - name: show
+    help: print saved settings and metadata
+  - name: context
+    help: Manage per-cluster node contexts used by hive
+    commands:
+    - name: create
+      help: Create a context
+      args:
+      - name: CLUSTER
+        help: A new or existing context cluster name
+        required: true
+      - name: CONTEXT
+        help: New context name
+        required: true
+        validate: context_name
+      - name: HOSTNAME
+        help: A valid 'docker node' hostname to associate with the context
+        required: true
+        validate: context_host
+    - name: discover
+      help: Discover neighbor nodes of the current context and auto-create context entries, skipping nodes for which contexts already exist
+      footer: |
+        Context template strings may use special template variables in the form {VARIABLE}
+        
+        The following context template variables are available:
+        - {CLUSTER}    The current hive context cluster
+        - {HOSTNAME}   The discovered docker node hostname
+        
+        Additionally, template variables may be piped to a shell command for modification. For example:
+        - {HOSTNAME|cut -d'.' -f1}
+        - {CLUSTER|tr A-Z a-z}
+        
+        Curly braces within a template variable body must be escaped
+      flags:
+      - long: --filter
+        short: -f
+        arg: FILTER
+        default: "membership=pending"
+        help: Filter output based on conditions provided, equivalent to 'docker node ls --filter'
+      - long: --ctx-name-template
+        help: A template to automatically generate context names instead of prompting individually
+        arg: TEMPLATE
+        default: "{CLUSTER}_{HOSTNAME|cut -d'.' -f1}"
+      - long: --ctx-docker-host-template
+        help: A template to automatically generate context DOCKER_HOST values instead of prompting individually
+        arg: TEMPLATE
+        default: "ssh://{HOSTNAME}"
+    - name: ls
+      help: List contexts
+    - name: prune
+      help: Remove hive contexts with absent cluster nodes
+      flags:
+      - long: --all
+        short: -a
+        help: Remove all hive contexts
+    - name: show
+      help: Print current context information
+      flags:
+      - long: --field
+        short: -f
+        arg: FIELD
+        allowed: [all, cluster, name, nodetype, dockerhost]
+        default: name   
+    - name: rm
+      help: Remove a context
+      args:
+      - name: CONTEXT
+        help: Context name
+        required: true
+    - name: update
+      help: Set the current hive context
+      args:
+      - name: CONTEXT
+        help: Existing context name
+        required: true
+      - name: DOCKER_HOST
+        help: A valid DOCKER_HOST value to associate with the context
+        required: true
+    - name: use
+      help: Set the current hive context
+      args:
+      - name: CONTEXT
+        help: Context name
+        required: true
+  - name: prompt
+    help: Configure PS1 prompt injection
+    commands:
+      - name: disable
+        help: Turn off prompt injection
+      - name: enable
+        help: Turn on prompt injection
+      - name: update
+        help: Set prompt template
+        footer: The default template is '^({CONTEXT}) '
+        args:
+        - name: TEMPLATE
+          help: A string where the token {CLUSTER} will be replaced with the current context cluster and {CONTEXT} will be replaced with the current context name. Prefix the string with a caret (^) to prepend the template to PS1 prompt, or suffix the string with a dollar sign ($) to append at the end of PS1 prompt
+          required: true
+          validate: parse_prompt
+  - name: ssh
+    help: Manage ssh connection arguments, multiplexing, and host keys
+    commands:
+    - name: credential
+      help: Manage username and ssh private key file path configurations for DOCKER_HOST ssh sessions
+      footer: >
+        All hive context DOCKER_HOST ssh connections will use the credentials configured here. Individual
+        credentials per context DOCKER_HOST are not supported
+      flags:
+      - long: --user
+        short: -u
+        arg: USER
+        help: The ssh username to be used in DOCKER_HOST ssh sessions (default current shell user)
+      - long: --identity-file
+        short: -i
+        arg: FILE
+        help: The path to the private key file for the given ssh user (default ssh client private key search behavior is used if no identity-file is supplied)
+      - long: --update-existing
+        help: Update all existing hive and docker context DOCKER_HOSTs with the ssh credentials supplied  
+    - name: hostkeys
+      help: Manage ssh host-keys for hive context hosts
+      commands:
+      - name: expire
+        help: Remove all context host-keys
+      - name: fetch
+        help: Retrieve all context host-keys
+      - name: refresh
+        help: Alias for 'hive config ssh hostkeys expire && hive config ssh hostkeys fetch'
+    - name: multiplex
+      help: Manage connection mulitplexing for hive context DOCKER_HOST ssh sessions
+      footer: Reference 'man ssh_config' for further information on ControlMaster configurations and options
+      commands:
+      - name: disable
+        help: Removes injected ssh multiplexing config from --ssh-config location
+      - name: enable
+        help: Inject ssh multiplexing config to --ssh-config location for hive context DOCKER_HOSTs
+      - name: update-settings
+        help: Define ssh_config multiplexing settings
+        flags:
+        - long: --ssh-config
+          short: -s
+          arg: PATH
+          help: Path to ssh config file for the hive context DOCKER_HOST ssh user (default $HOME/.ssh/config)
+          default: $HOME/.ssh/config
+        - long: --control-path
+          arg: PATH
+          help: Path and filename template string for ssh ControlMaster ControlPath socket files
+          default: "$HOME/.ssh/%%r@%%h.sock"
+        - long: --control-persist
+          arg: DURATION
+          help: Duration to retain multiplexed ssh connection sockets (default 60m)
+          default: 60m
+        - long: --server-alive-interval
+          arg: INT
+          help: Interval duration in seconds to send KeepAlive packets over the active ssh session (default 300)
+          default: "300"
+          validate: integer
+- name: connect
+  help: Set current context to most recently used, set prompt injection if enabled, and initialize sessions
+- name: disconnect
+  help: Unset current context and prompt injection, and close open sessions
+- name: docker
+  help: Docker management commands
+  commands:
+  - name: bounce
+    help: Rolling restart one or more services by calling 'docker service update --force'
+    args:
+      - name: SERVICE
+        help: A service name or ID
+        repeatable: true
+        required: true
+    flags:
+    - long: --container-parallel
+      help: Restart all replica containers of each service simultaneously. Will disrupt service availability unless the service is configured with '--update-order "start-first"'
+  - name: context
+    help: Manage 'docker context' contexts
+    commands:
+    - name: discover
+      help: Automatically create missing local 'docker context' entries from discovered and optionally filtered 'docker node ls' hosts
+      footer: |
+        Context template strings may use special template variables in the form {VARIABLE}
+        
+        The following context template variables are available:
+        - {CLUSTER}    The current hive context cluster
+        - {HOSTNAME}   The discovered docker node hostname
+        
+        Additionally, template variables may be piped to a shell command for modification. For example:
+        - {HOSTNAME|cut -d'.' -f1}
+        - {CLUSTER|tr A-Z a-z}
+        
+        Curly braces within a template variable body must be escaped
+        
+        Use 'docker context ls' to list docker contexts
+      flags:
+      - long: --filter
+        short: -f
+        arg: FILTER
+        default: "membership=pending"
+        help: Filter output based on conditions provided, equivalent to 'docker node ls --filter'
+      - long: --ctx-name-template
+        help: A template to automatically generate context names instead of prompting individually
+        arg: TEMPLATE
+        default: "{CLUSTER}_{HOSTNAME|cut -d'.' -f1}"
+      - long: --ctx-docker-host-template
+        help: A template to automatically generate context DOCKER_HOST values instead of prompting individually
+        arg: TEMPLATE
+        default: "ssh://{HOSTNAME}"
+    - name: prune
+      help: Remove 'docker context' contexts created by hive (default contexts with absent cluster nodes)
+      flags:
+      - long: --all
+        short: -a
+        help: Remove all contexts created by hive
+  - name: exec
+    help: Run a command in a running container anywhere in the Swarm
+    footer: |
+      By default executes command equivalent to "docker exec -i -t CONTAINER COMMAND"
+      
+      Makes a best-effort to resolve SERVICE to a child CONTAINER. If SERVICE has multiple child containers, the list of containers will be presented with a selection prompt
+    args:
+    - name: SERVICE
+      help: A service name or id to run the command against
+      required: true
+    - name: COMMAND
+      help: The command to pass to the target container or service
+      required: true
+    flags:
+    - long: --extra-opts
+      short: -o
+      arg: OPTS
+      help: A single string of extra command line flags corresponding to the available flags for 'docker exec'
+      default: '-i -t'
+  - name: host-exec
+    help: Run a command on the host running a target container
+    footer: |
+      Executes command equivalent to 'ssh -t CONTAINER_HOST bash -l -c "COMMAND"'
+      
+      Makes a best-effort to resolve SERVICE to a child container to determine CONTAINER_HOST. If SERVICE has multiple child containers, the list of containers and hosts will be presented with a selection prompt
+    args:
+    - name: SERVICE
+      help: A service name or id to resolve a CONTAINER_HOST for
+      required: true
+    - name: COMMAND
+      help: The command to pass to the target host
+      required: true
+  - name: image
+    help: Manage images
+    commands:
+    - name: ls
+      help: List images across all nodes
+      flags:
+      - long: --filter
+        short: -f
+        arg: FILTER
+        default: "."
+        help: Filter output based on conditions provided, equivalent to 'docker image ls --filter'
+      - long: --format
+        arg: FORMAT
+        help: Pretty-print containers using a Go template, equivalent to 'docker image ls --format'
+    - name: inspect
+      help: Alias for 'hive inspect --type image'
+      args:
+      - name: IMAGE
+        help: An image name/tag or ID
+        required: true
+      flags:
+      - long: --format
+        short: -f
+        arg: FORMAT
+        help: Pretty-print containers using a Go template, equivalent to 'docker image inspect --format'
+  - name: images
+    help: Alias for 'hive image ls'
+    flags:
+    - long: --filter
+      short: -f
+      arg: FILTER
+      default: "."
+      help: Filter output based on conditions provided, equivalent to 'docker image ls --filter'
+    - long: --format
+      arg: FORMAT
+      help: Pretty-print containers using a Go template, equivalent to 'docker image ls --format'
+  - name: inspect
+    help: Return low-level information on Docker objects
+    footer: >
+      Searches all objects and across all nodes by default. Different types of objects can have
+      the same name, and same types of objects can have the same name across different nodes,
+      making lookups without --type and --node restrictions potentially ambiguous
+    args:
+    - name: OBJECT
+      help: A docker object such as a service name, container ID, node hostname, image , etc
+      required: true
+    flags:
+    - long: --format
+      arg: FORMAT
+      help: Pretty-print containers using a Go template, equivalent to 'docker inspect --format'
+    - long: --type
+      short: -t
+      arg: TYPE
+      help: Restricts the lookup to a certain object type
+      allowed: [config, container, image, network, node, secret, service, stack, volume, task]
+      default: auto
+    - long: --node
+      short: -n
+      arg: NODE
+      help: Restricts the lookup to objects present on a given NODE, where NODE matches a 'docker node ls' hostname
+  - name: logs
+    help: Get multiple 'docker service logs' streams in parallel
+    footer: Executes command equivalent to 'parallel -P# -i docker service logs --tail=TAIL [-f] {} <<< SERVICES'
+    args:
+    - name: SERVICE
+      help: One or more exact service names
+      repeatable: true
+      required: true
+    flags:
+    - long: --follow
+      short: -f
+      help: Follow log output
+    - long: --tail
+      short: -n
+      arg: TAIL
+      help: Number of lines to show from the end of each log stream (default 100)
+      default: "100"
+      validate: integer
+    - long: --max-streams
+      short: -m
+      arg: MAX_STREAMS
+      help: Max allowed number of parallel streams, to protect the Docker daemon from excess throughput (default 6)
+      default: "6"
+      validate: integer
+    - long: --extra-opts
+      short: -o
+      arg: OPTS
+      help: A single string of extra command line flags corresponding to the available flags for 'docker service logs'
+  - name: ps
+    help: List containers across all nodes
+    flags:
+    - long: --all
+      short: -a
+      help: Include stopped containers
+    - long: --filter
+      short: -f
+      arg: FILTER
+      default: "."
+      help: Filter output based on conditions provided, equivalent to 'docker ps --filter'
+    - long: --format
+      arg: FORMAT
+      help: Pretty-print containers using a Go template, equivalent to 'docker ps --format'
+    - long: --output
+      arg: OUTPUT
+      allowed: [compact, json, table]
+      default: table
+    - long: --extra-opts
+      short: -o
+      arg: OPTS
+      help: A single string of extra command line flags corresponding to the available flags for 'docker ps'
+  - name: restart-hack
+    help: Restart a container without Swarm scheduler interference
+    footer: |
+      A regular 'docker restart' of a Swarm-managed container may result in a
+      duplicate container being spawned by the scheduler if it is recognized as
+      a container failure
+      
+      This command implements a workaround by pausing Swarm scheduling on the
+      container's host node, restarting the container, then resuming scheduling
+      
+      This command takes the following equivalent actions:
+      
+      - docker node update --availability=pause NODE
+      - DOCKER_HOST=ssh://NODE docker restart CONTAINER
+      - sleep 5
+      - docker node update --availability=active NODE
+    args:
+    - name: CONTAINER
+      help: A container name or ID. Will NOT accept a service name or ID. Will attempt to resolve the container host, but in the case of ambiguous container name command will exit with error
+      required: true
+    flags:
+    - long: --node
+      short: -n
+      arg: NODE
+      help: Restricts the container lookup to container present on given NODE, where NODE matches a 'docker node ls' hostname  
