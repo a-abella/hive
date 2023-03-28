@@ -1,14 +1,5 @@
 .DS_STORE
 .vscode/
 
-# bashly built-in validations
-src/lib/validations/validate_dir_exists.sh
-src/lib/validations/validate_file_exists.sh
-src/lib/validations/validate_integer.sh
-src/lib/validations/validate_not_empty.sh
-
-# bashly built-in libs
-src/lib/config.sh
-
 # bashly generate build artifact
 hive
