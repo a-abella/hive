@@ -13,70 +13,70 @@ commands:
   commands:
   - name: init
     help: Run the initial setup prompts retaining current settings as defaults
-  - name: reload
-    help: Re-read local settings and re-execute necessary local configurations. Useful if you copied settings file between systems
+  - name: load
+    help: >
+      Read settings file and re-execute necessary local configurations. Useful
+      if you copied settings file between systems
     flags:
     - long: --file
       short: -f
       arg: FILE
-      help: Optional path to settings file. If pointed to a non-default location, settings will be copied to the default $HOME/.hive-settings.ini
-      default: $HOME/.hive-settings.ini
+      help: >
+        Path to settings file. If pointed to non-default settings file location,
+        unset settings will be merged into the default $HOME/.hive-settings.ini
+      required: true
       validate: file_exists
+    - long: --force
+      help: Fully overwrite $HOME/.hive-settings.ini with values provided from --file
+  - name: reload
+    help: Alias for 'hive config load --file $HOME/.hive-settings.ini'
   - name: show
     help: print saved settings and metadata
   - name: context
-    help: Manage per-cluster node contexts used by hive
+    help: Manage cluster contexts used by hive
+    footer: >
+      Whereas a docker context is associated with a single Docker host, a hive
+      context refers to entire Swarm clusters
     commands:
     - name: create
-      help: Create a context
+      help: Create context
       args:
-      - name: CLUSTER
-        help: A new or existing context cluster name
-        required: true
-      - name: CONTEXT
-        help: New context name
+      - name: NAME
+        help: >
+          A unique identifying name refering to a Docker Swarm cluster, such as
+          "dev", "prod", "ci", etc
         required: true
         validate: context_name
-      - name: HOSTNAME
-        help: A valid 'docker node' hostname to associate with the context
+      - name: MANAGER
+        help: >
+          A hostname for a Swarm Manager node within the cluster; further
+          managers can be autodiscovered with 'hive context discover'
         required: true
         validate: context_host
+      flags:
+      - long: --description
+        short: -d
+        help: Optional description of the context
     - name: discover
-      help: Discover neighbor nodes of the current context and auto-create context entries, skipping nodes for which contexts already exist
-      footer: |
-        Context template strings may use special template variables in the form {VARIABLE}
-        
-        The following context template variables are available:
-        - {CLUSTER}    The current hive context cluster
-        - {HOSTNAME}   The discovered docker node hostname
-        
-        Additionally, template variables may be piped to a shell command for modification. For example:
-        - {HOSTNAME|cut -d'.' -f1}
-        - {CLUSTER|tr A-Z a-z}
-        
-        Curly braces within a template variable body must be escaped
+      help: Discover neighbor nodes of the current context
       flags:
       - long: --filter
         short: -f
         arg: FILTER
-        default: "membership=pending"
-        help: Filter output based on conditions provided, equivalent to 'docker node ls --filter'
-      - long: --ctx-name-template
-        help: A template to automatically generate context names instead of prompting individually
-        arg: TEMPLATE
-        default: "{CLUSTER}_{HOSTNAME|cut -d'.' -f1}"
-      - long: --ctx-docker-host-template
-        help: A template to automatically generate context DOCKER_HOST values instead of prompting individually
-        arg: TEMPLATE
-        default: "ssh://{HOSTNAME}"
+        help: >
+          Filter output based on conditions provided, equivalent to 'docker node
+          ls --filter'; a filter of 'role=manager' is implicitly applied
     - name: ls
       help: List contexts
-    - name: prune
-      help: Remove hive contexts with absent cluster nodes
+    - name: node-prune
+      help: Remove saved manager nodes absent from the current context cluster
       flags:
       - long: --all
         short: -a
-        help: Remove all hive contexts
+        help: >
+          Remove all manager nodes from the context; WARNING-- you will need to
+          re-populate the context with at least one manager via 'hive config
+          init' or 'hive config context update --add-node'
     - name: show
       help: Print current context information
       flags:
@@ -87,19 +87,36 @@ commands:
         default: name   
     - name: rm
       help: Remove a context
+      footer: Removing the current context will implicitly call 'hive disconnect' before removal
       args:
       - name: CONTEXT
         help: Context name
         required: true
     - name: update
-      help: Set the current hive context
+      help: Modify context attributes
       args:
-      - name: CONTEXT
-        help: Existing context name
-        required: true
-      - name: DOCKER_HOST
-        help: A valid DOCKER_HOST value to associate with the context
-        required: true
+      - name: NAME
+        help: The context to update, defaults to the current context if none is provided
+        required: false
+      flags:
+      - long: --name
+        short: -n
+        help: New name for the context
+      - long: --description
+        short: -d
+        help: New description of the context
+      - long: --add-node
+        help: >
+          A Swarm manager hostname to add to the context; WARNING-- this will
+          NOT prevent you from adding manager nodes from multiple clusters. For
+          safety instead use 'hive config context discover' with a '--filter
+          name='
+      - long: --rm-node
+        help: >
+          A Swarm manager hostname to remove from the context; WARNING-- if you
+          remove the last/only manager you will need to re-populate the context
+          with at least one manager via 'hive config init' or 'hive config
+          context update --add-node'
     - name: use
       help: Set the current hive context
       args:
@@ -107,18 +124,56 @@ commands:
         help: Context name
         required: true
   - name: prompt
-    help: Configure PS1 prompt injection
+    help: Configure PS1 and output-prefix prompt injection
     commands:
       - name: disable
         help: Turn off prompt injection
+        flags:
+        - long: --docker-prefix
+          help: Disable prefix of prompt on 'hive docker' command output
       - name: enable
         help: Turn on prompt injection
+        flags:
+        - long: --output-prefix
+          help: Prefixes all 'hive docker' command output with the prompt
       - name: update
         help: Set prompt template
-        footer: The default template is '^({CONTEXT}) '
+        footer: |
+          Prompt template strings may use special template variables in the
+          form {VARIABLE}
+          
+          The following context template variables are available:
+          - {CONTEXT}     The current hive cluster context name
+          - {MANAGER}     The currently selected context manager receiving
+                            Swarm commands
+          - {DOCKERHOST}  The hostname of the Docker host currently executing
+                            Docker commands; only relevant when output-prefix
+                            is enabled
+                            
+          Additionally, template variables may be piped to a shell command for
+          modification. For example:
+          - {DOCKERHOST|cut -d'.' -f1}
+          - {CONTEXT|tr A-Z a-z}
+          
+          Curly braces within a template variable body must be escaped
+          
+          The PS1 prompt type can additionally use caret (^) and dollar-sign ($)
+          characters with special meaning:
+          - ^   A caret as the FIRST character of a template indicates that the
+                  prompt will be PREPENDED to the PS1 environment variable
+          - $   A dollar-sign as the LAST character of a template indicates that the
+                  prompt will be APPENDED to the PS1 environment variable
+          
+          The default templates for each prompt type are:
+          - PS1             '^({CONTEXT}) '
+          - output-prefix   '({CONTEXT} {DOCKERHOST|cut -d'.' -f1})  '
         args:
+        - name: PROMPT
+          help: Select which prompt to apply the template
+          allowed: [PS1, output-prefix]
+          required: true
         - name: TEMPLATE
-          help: A string where the token {CLUSTER} will be replaced with the current context cluster and {CONTEXT} will be replaced with the current context name. Prefix the string with a caret (^) to prepend the template to PS1 prompt, or suffix the string with a dollar sign ($) to append at the end of PS1 prompt
+          help: Template string to apply
           required: true
           validate: parse_prompt
   - name: ssh
@@ -127,8 +182,9 @@ commands:
     - name: credential
       help: Manage username and ssh private key file path configurations for DOCKER_HOST ssh sessions
       footer: >
-        All hive context DOCKER_HOST ssh connections will use the credentials configured here. Individual
-        credentials per context DOCKER_HOST are not supported
+        All hive context DOCKER_HOST ssh connections will use the credentials
+        configured here. Individual credentials per context DOCKER_HOST are not
+        supported
       flags:
       - long: --user
         short: -u
@@ -137,8 +193,11 @@ commands:
       - long: --identity-file
         short: -i
         arg: FILE
-        help: The path to the private key file for the given ssh user (default ssh client private key search behavior is used if no identity-file is supplied)
-      - long: --update-existing
+        help: >
+          The path to the private key file for the given ssh user (default ssh
+          client private key search behavior is used if no identity-file is
+          supplied)
+      - long: --update-contexts
         help: Update all existing hive and docker context DOCKER_HOSTs with the ssh credentials supplied  
     - name: hostkeys
       help: Manage ssh host-keys for hive context hosts
@@ -194,12 +253,17 @@ commands:
         required: true
     flags:
     - long: --container-parallel
-      help: Restart all replica containers of each service simultaneously. Will disrupt service availability unless the service is configured with '--update-order "start-first"'
+      help: >
+        Restart all replica containers of each service simultaneously. Will
+        disrupt service availability unless the service is configured with
+        '--update-order "start-first"'
   - name: context
     help: Manage 'docker context' contexts
     commands:
     - name: discover
-      help: Automatically create missing local 'docker context' entries from discovered and optionally filtered 'docker node ls' hosts
+      help: >
+        Automatically create missing local 'docker context' entries from
+        discovered and optionally filtered 'docker node ls' hosts
       footer: |
         Context template strings may use special template variables in the form {VARIABLE}
         
@@ -236,10 +300,13 @@ commands:
         help: Remove all contexts created by hive
   - name: exec
     help: Run a command in a running container anywhere in the Swarm
-    footer: |
+    footer: >
       By default executes command equivalent to "docker exec -i -t CONTAINER COMMAND"
       
-      Makes a best-effort to resolve SERVICE to a child CONTAINER. If SERVICE has multiple child containers, the list of containers will be presented with a selection prompt
+      
+      Makes a best-effort to resolve SERVICE to a child CONTAINER. If SERVICE
+      has multiple child containers, the list of containers will be presented
+      with a selection prompt
     args:
     - name: SERVICE
       help: A service name or id to run the command against
@@ -255,10 +322,13 @@ commands:
       default: '-i -t'
   - name: host-exec
     help: Run a command on the host running a target container
-    footer: |
+    footer: >
       Executes command equivalent to 'ssh -t CONTAINER_HOST bash -l -c "COMMAND"'
       
-      Makes a best-effort to resolve SERVICE to a child container to determine CONTAINER_HOST. If SERVICE has multiple child containers, the list of containers and hosts will be presented with a selection prompt
+      
+      Makes a best-effort to resolve SERVICE to a child container to determine
+      CONTAINER_HOST. If SERVICE has multiple child containers, the list of
+      containers and hosts will be presented with a selection prompt
     args:
     - name: SERVICE
       help: A service name or id to resolve a CONTAINER_HOST for
@@ -394,10 +464,15 @@ commands:
       - docker node update --availability=active NODE
     args:
     - name: CONTAINER
-      help: A container name or ID. Will NOT accept a service name or ID. Will attempt to resolve the container host, but in the case of ambiguous container name command will exit with error
+      help: >
+        A container name or ID. Will NOT accept a service name or ID. Will
+        attempt to resolve the container host, but in the case of ambiguous
+        container name command will exit with error
       required: true
     flags:
     - long: --node
       short: -n
       arg: NODE
-      help: Restricts the container lookup to container present on given NODE, where NODE matches a 'docker node ls' hostname  
+      help: >
+        Restricts the container lookup to container present on given NODE, where
+        NODE matches a 'docker node ls' hostname  
