@@ -2,8 +2,8 @@
 initialize_settings() {
   config_init
   case "$1" in
-    context )
-      initialize_context_settings "$2"
+    cluster )
+      initialize_cluster_settings "$2"
     ;;
     prompt )
       initialize_prompt_settings "$2"
@@ -14,7 +14,7 @@ initialize_settings() {
     all )
       initialize_ssh_settings "$2"
       initialize_prompt_settings "$2"
-      initialize_context_settings "$2"
+      initialize_cluster_settings "$2"
     ;;
     * )
       fmt_echo "BUG: unknown call '${FUNCNAME[0]} $*'"
@@ -35,6 +35,7 @@ write_conf_items() {
 }
 
 initialize_ssh_settings() {
+    # shellcheck disable=SC2034
     declare -A setting_map=(
       [ssh_credential_user]="$USER"
       [ssh_multiplex_enabled]="true"
@@ -47,17 +48,20 @@ initialize_ssh_settings() {
 }
 
 initialize_prompt_settings() {
+    # shellcheck disable=SC2034
     declare -A setting_map=(
       [prompt_enabled]="true"
-      [prompt_template]="^({CLUSTER}|{CONTEXT}) "
+      [prompt_template_ps1]="^({CLUSTER}) "
+      [prompt_template_output_prefix]="({CLUSTER} {DOCKERHOST|cut -d'.' -f1})  "
     )
     write_conf_items setting_map
 }
 
-initialize_context_settings() {
+initialize_cluster_settings() {
+    # shellcheck disable=SC2034
     declare -A setting_map=(
-      [context_current]=""
-      [context_list]=""
+      [cluster_current]=""
+      [cluster_list]=""
     )
     write_conf_items setting_map
 }
