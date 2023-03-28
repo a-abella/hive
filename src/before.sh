@@ -19,8 +19,8 @@ else
       :
       ;;
     * )
-      echo "Unable to load context from $CONFIG_FILE"
-      echo "Run '$0 config init' to initialize $CONFIG_FILE"
+      fmt_echo "Unable to load context from $CONFIG_FILE"
+      fmt_echo "Run '$0 config init' or '$0 config reload -f {config_file}' to initialize $CONFIG_FILE"
       false
       ;;
   esac
