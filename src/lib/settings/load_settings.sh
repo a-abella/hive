@@ -8,9 +8,10 @@ load_settings() {
     
     case "$action" in
       "config init" )
+      
         :
       ;;
-      "config load"* | "config reload"* )
+      "config load"* | "config reload" )
         :
       ;;
       * )

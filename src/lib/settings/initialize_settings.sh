@@ -11,7 +11,7 @@ initialize_settings() {
     ssh )
       initialize_ssh_settings "$2"
     ;;
-    "" )
+    all )
       initialize_ssh_settings "$2"
       initialize_prompt_settings "$2"
       initialize_context_settings "$2"

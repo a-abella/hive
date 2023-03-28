@@ -17,11 +17,14 @@ else
   case "$action" in
     "config init" | "config reload" )
       :
-      ;;
+    ;;
+    "config load" )
+      :
+    ;;
     * )
       fmt_echo "Unable to load context from $CONFIG_FILE"
       fmt_echo "Run '$0 config init' or '$0 config reload -f {config_file}' to initialize $CONFIG_FILE"
       false
-      ;;
+    ;;
   esac
 fi
