@@ -3,6 +3,9 @@ help: A single-pane toolbox for Docker Swarm
 version: 0.0.1
 
 environment_variables:
+- name: HIVE_SETTINGS
+  help: Settings file path
+  default: "$HOME/.hive-settings.ini"
 - name: DEBUG
   help: Enable debug printing
   default: "0"
@@ -13,33 +16,17 @@ commands:
   commands:
   - name: init
     help: Run the initial setup prompts retaining current settings as defaults
-  - name: load
-    help: >
-      Read settings file and re-execute necessary local configurations. Useful
-      if you copied settings file between systems
-    flags:
-    - long: --file
-      short: -f
-      arg: FILE
-      help: >
-        Path to settings file. If pointed to non-default settings file location,
-        unset settings will be merged into the default $HOME/.hive-settings.ini
-      required: true
-      validate: file_exists
-    - long: --force
-      help: Fully overwrite $HOME/.hive-settings.ini with values provided from --file
   - name: reload
-    help: Alias for 'hive config load --file $HOME/.hive-settings.ini'
+    help: >
+      Re-read settings file and re-execute necessary local configurations. Useful
+      if you copied settings files between systems
   - name: show
     help: print saved settings and metadata
-  - name: context
-    help: Manage cluster contexts used by hive
-    footer: >
-      Whereas a docker context is associated with a single Docker host, a hive
-      context refers to entire Swarm clusters
+  - name: cluster
+    help: Manage cluster metadata used by hive
     commands:
-    - name: create
-      help: Create context
+    - name: add
+      help: Add a cluster
       args:
       - name: NAME
         help: >
@@ -50,15 +37,15 @@ commands:
       - name: MANAGER
         help: >
           A hostname for a Swarm Manager node within the cluster; further
-          managers can be autodiscovered with 'hive context discover'
+          managers can be autodiscovered with 'hive cluster discover'
         required: true
         validate: context_host
       flags:
       - long: --description
         short: -d
-        help: Optional description of the context
+        help: Optional description of the cluster
     - name: discover
-      help: Discover neighbor nodes of the current context
+      help: Discover neighbor managers of the current cluster manager
       flags:
       - long: --filter
         short: -f
@@ -67,18 +54,18 @@ commands:
           Filter output based on conditions provided, equivalent to 'docker node
           ls --filter'; a filter of 'role=manager' is implicitly applied
     - name: ls
-      help: List contexts
+      help: List clusters
     - name: node-prune
-      help: Remove saved manager nodes absent from the current context cluster
+      help: Remove saved manager nodes absent from the current swarm cluster node list
       flags:
       - long: --all
         short: -a
         help: >
-          Remove all manager nodes from the context; WARNING-- you will need to
-          re-populate the context with at least one manager via 'hive config
-          init' or 'hive config context update --add-node'
+          Remove all manager nodes from the saved cluster data; WARNING-- you will need to
+          re-populate the saved cluster data with at least one manager via 'hive config
+          init' or 'hive config cluster update --add-node'
     - name: show
-      help: Print current context information
+      help: Print current cluster setting information
       flags:
       - long: --field
         short: -f
@@ -86,42 +73,42 @@ commands:
         allowed: [all, cluster, name, nodetype, dockerhost]
         default: name   
     - name: rm
-      help: Remove a context
-      footer: Removing the current context will implicitly call 'hive disconnect' before removal
+      help: Remove a cluster from hive management
+      footer: Removing the current cluster will implicitly call 'hive disconnect' before removal
       args:
-      - name: CONTEXT
-        help: Context name
+      - name: CLUSTER
+        help: Cluster name
         required: true
     - name: update
-      help: Modify context attributes
+      help: Modify cluster attributes
       args:
       - name: NAME
-        help: The context to update, defaults to the current context if none is provided
+        help: The cluster to update, defaults to the current cluster if none is provided
         required: false
       flags:
       - long: --name
         short: -n
-        help: New name for the context
+        help: New name for the cluster
       - long: --description
         short: -d
-        help: New description of the context
+        help: New description of the cluster
       - long: --add-node
         help: >
-          A Swarm manager hostname to add to the context; WARNING-- this will
-          NOT prevent you from adding manager nodes from multiple clusters. For
-          safety instead use 'hive config context discover' with a '--filter
-          name='
+          A Swarm manager hostname to add to the cluster data; WARNING-- this
+          will NOT prevent you from adding manager nodes from multiple Swarm
+          clusters. For safety instead use 'hive config cluster discover' with a
+          '--filter name='
       - long: --rm-node
         help: >
-          A Swarm manager hostname to remove from the context; WARNING-- if you
-          remove the last/only manager you will need to re-populate the context
-          with at least one manager via 'hive config init' or 'hive config
-          context update --add-node'
+          A Swarm manager hostname to remove from the cluster data; WARNING-- if
+          you remove the last/only manager you will need to re-populate the
+          cluster data with at least one manager via 'hive config init' or 'hive
+          config cluster update --add-node'
     - name: use
-      help: Set the current hive context
+      help: Set the current hive cluster
       args:
-      - name: CONTEXT
-        help: Context name
+      - name: CLUSTER
+        help: Cluster name
         required: true
   - name: prompt
     help: Configure PS1 and output-prefix prompt injection
@@ -129,7 +116,7 @@ commands:
       - name: disable
         help: Turn off prompt injection
         flags:
-        - long: --docker-prefix
+        - long: --output-prefix
           help: Disable prefix of prompt on 'hive docker' command output
       - name: enable
         help: Turn on prompt injection
@@ -142,9 +129,9 @@ commands:
           Prompt template strings may use special template variables in the
           form {VARIABLE}
           
-          The following context template variables are available:
-          - {CONTEXT}     The current hive cluster context name
-          - {MANAGER}     The currently selected context manager receiving
+          The following template variables are available:
+          - {CLUSTER}     The current hive cluster name
+          - {MANAGER}     The currently selected cluster manager receiving
                             Swarm commands
           - {DOCKERHOST}  The hostname of the Docker host currently executing
                             Docker commands; only relevant when output-prefix
@@ -153,7 +140,7 @@ commands:
           Additionally, template variables may be piped to a shell command for
           modification. For example:
           - {DOCKERHOST|cut -d'.' -f1}
-          - {CONTEXT|tr A-Z a-z}
+          - {CLUSTER|tr A-Z a-z}
           
           Curly braces within a template variable body must be escaped
           
@@ -165,8 +152,8 @@ commands:
                   prompt will be APPENDED to the PS1 environment variable
           
           The default templates for each prompt type are:
-          - PS1             '^({CONTEXT}) '
-          - output-prefix   '({CONTEXT} {DOCKERHOST|cut -d'.' -f1})  '
+          - PS1             "^({CLUSTER}) "
+          - output-prefix   "({CLUSTER} {DOCKERHOST|cut -d'.' -f1})  "
         args:
         - name: PROMPT
           help: Select which prompt to apply the template
@@ -182,14 +169,17 @@ commands:
     - name: credential
       help: Manage username and ssh private key file path configurations for DOCKER_HOST ssh sessions
       footer: >
-        All hive context DOCKER_HOST ssh connections will use the credentials
-        configured here. Individual credentials per context DOCKER_HOST are not
-        supported
+        All hive ssh connections will use the credentials configured here.
+        Individual credentials per cluster are not supported. If you need
+        per-cluster credentials you can maintain a settings file per cluster.
+        You can specify alternate settings file paths with the HIVE_SETTINGS
+        environment variable
       flags:
       - long: --user
         short: -u
         arg: USER
         help: The ssh username to be used in DOCKER_HOST ssh sessions (default current shell user)
+        default: $USER
       - long: --identity-file
         short: -i
         arg: FILE
@@ -197,36 +187,36 @@ commands:
           The path to the private key file for the given ssh user (default ssh
           client private key search behavior is used if no identity-file is
           supplied)
-      - long: --update-contexts
-        help: Update all existing hive and docker context DOCKER_HOSTs with the ssh credentials supplied  
+      - long: --reload
+        help: Trigger a 'hive config reload' to apply updated ssh information to ssh multiplexing configs
     - name: hostkeys
-      help: Manage ssh host-keys for hive context hosts
+      help: Manage ssh host-keys for current cluster hosts
       commands:
       - name: expire
-        help: Remove all context host-keys
+        help: Remove all cluster host-keys
       - name: fetch
-        help: Retrieve all context host-keys
+        help: Retrieve all cluster host-keys
       - name: refresh
         help: Alias for 'hive config ssh hostkeys expire && hive config ssh hostkeys fetch'
     - name: multiplex
-      help: Manage connection mulitplexing for hive context DOCKER_HOST ssh sessions
+      help: Manage connection mulitplexing for hive DOCKER_HOST ssh sessions
       footer: Reference 'man ssh_config' for further information on ControlMaster configurations and options
       commands:
       - name: disable
         help: Removes injected ssh multiplexing config from --ssh-config location
       - name: enable
-        help: Inject ssh multiplexing config to --ssh-config location for hive context DOCKER_HOSTs
+        help: Inject ssh multiplexing config to --ssh-config location for hive DOCKER_HOSTs
       - name: update-settings
         help: Define ssh_config multiplexing settings
         flags:
         - long: --ssh-config
           short: -s
           arg: PATH
-          help: Path to ssh config file for the hive context DOCKER_HOST ssh user (default $HOME/.ssh/config)
+          help: Path to ssh config file for hive user (default $HOME/.ssh/config)
           default: $HOME/.ssh/config
         - long: --control-path
           arg: PATH
-          help: Path and filename template string for ssh ControlMaster ControlPath socket files
+          help: Path and filename template string for ssh ControlMaster ControlPath socket files (default $HOME/.ssh/%%r@%%h.sock)
           default: "$HOME/.ssh/%%r@%%h.sock"
         - long: --control-persist
           arg: DURATION
@@ -238,9 +228,9 @@ commands:
           default: "300"
           validate: integer
 - name: connect
-  help: Set current context to most recently used, set prompt injection if enabled, and initialize sessions
+  help: Set current cluster to most recently used, set prompt injection if enabled, and initialize sessions
 - name: disconnect
-  help: Unset current context and prompt injection, and close open sessions
+  help: Unset current cluster and prompt injection, and close open sessions
 - name: docker
   help: Docker management commands
   commands:
@@ -268,14 +258,18 @@ commands:
         Context template strings may use special template variables in the form {VARIABLE}
         
         The following context template variables are available:
-        - {CLUSTER}    The current hive context cluster
+        - {CLUSTER}    The current hive cluster
         - {HOSTNAME}   The discovered docker node hostname
         
-        Additionally, template variables may be piped to a shell command for modification. For example:
+        Additionally, template variables may be piped to a shell command for
+        modification. For example:
         - {HOSTNAME|cut -d'.' -f1}
         - {CLUSTER|tr A-Z a-z}
         
         Curly braces within a template variable body must be escaped
+        
+        The default template is:
+        - {CLUSTER}_{HOSTNAME|cut -d'.' -f1}
         
         Use 'docker context ls' to list docker contexts
       flags:
@@ -293,13 +287,13 @@ commands:
         arg: TEMPLATE
         default: "ssh://{HOSTNAME}"
     - name: prune
-      help: Remove 'docker context' contexts created by hive (default contexts with absent cluster nodes)
+      help: "Remove dangling 'docker context' contexts created by hive (dangling: contexts with absent cluster nodes)"
       flags:
       - long: --all
         short: -a
         help: Remove all contexts created by hive
   - name: exec
-    help: Run a command in a running container anywhere in the Swarm
+    help: Run a command in a running container located somewhere in the Swarm
     footer: >
       By default executes command equivalent to "docker exec -i -t CONTAINER COMMAND"
       

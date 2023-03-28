@@ -7,4 +7,4 @@
 if (( DEBUG )); then
     set -xv
 fi
-CONFIG_FILE="${HOME}/.hive-settings.ini"
+CONFIG_FILE="${HIVE_SETTINGS}"
