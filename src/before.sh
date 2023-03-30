@@ -30,3 +30,5 @@ if ! config_has_key cluster_current ; then
     ;;
   esac
 fi
+
+load_hive_cluster

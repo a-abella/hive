@@ -47,7 +47,20 @@ initialize_ssh_settings() {
       [ssh_multiplex_controlpersist]="60m"
       [ssh_multiplex_serveraliveinterval]="300"
     )
-    write_conf_items setting_map
+    
+    declare -A desc_map=(
+      [ssh_credential_user]="The ssh username to be used in DOCKER_HOST ssh sessions"
+      [ssh_credential_identity_file]="Path to the private key file for the given ssh user,\n; if left blank default ssh client key search behavior is used"
+      [ssh_keyfile_path]="Path to the hive-managed known_hosts keyfile location"
+      [ssh_keyfile_hashknownhosts]="Sets ssh HashKnownHosts value"
+      [ssh_multiplex_enabled]="Inject ssh multiplexing to sshconfig location for DOCKER_HOSTs,\n; Reference 'man ssh_config' for further information on ControlMaster configurations and options"
+      [ssh_multiplex_sshconfig]="Path to the ssh_config file for the given ssh user"
+      [ssh_multiplex_controlpath]="Path and filename template string for ssh ControlMaster ControlPath socket files"
+      [ssh_multiplex_controlpersist]="Duration to retain multiplexed ssh connection sockets"
+      [ssh_multiplex_serveraliveinterval]="Interval duration in seconds to send KeepAlive packets over the active ssh session"
+    )
+    
+    write_conf_items setting_map desc_map
 }
 
 initialize_prompt_settings() {
