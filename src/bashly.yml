@@ -230,7 +230,7 @@ commands:
             validate: file_exists
           - long: --hash-hosts
             arg: BOOL
-            help: Set ssh HashKnownHosts value, triggers 'hive config ssh hostkeys refresh'
+            help: Sets ssh HashKnownHosts value, triggers 'hive config ssh hostkeys refresh'
             allowed: ["true", "false"]
       - name: refresh
         help: Alias for 'hive config ssh hostkeys expire && hive config ssh hostkeys fetch'
