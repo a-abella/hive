@@ -7,6 +7,6 @@
 echo "==[ After Hook Called ]=="
 inspect_args
 
-if (( DEBUG )); then
+if [[ $DEBUG -gt 1 ]]; then
     ( set -o posix ; set | sed -e 's/^/_after__/' )
 fi

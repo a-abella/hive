@@ -1,3 +1,3 @@
 fmt_echo() {
-  echo "$@" | fmt -
+  echo "$*" | fmt -
 }

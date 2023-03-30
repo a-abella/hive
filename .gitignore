@@ -3,3 +3,4 @@
 
 # bashly generate build artifact
 hive
+.hive-settings.ini

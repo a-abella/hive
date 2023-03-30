@@ -5,26 +5,28 @@
 ##
 ## You can safely delete this file if you do not need it.
 echo "==[ Before Hook Called ]=="
+dbg_echo "action: $action"
 inspect_args
-
-if (( DEBUG )); then
+if [[ $DEBUG -gt 1 ]]; then
   ( set -o posix ; set | sed -e 's/^/_before__/' )
 fi
 
-if config_has_key context_current ; then
-  load_hive_context
-else
+load_settings all
+
+if ! config_has_key cluster_current ; then
   case "$action" in
-    "config init" | "config reload" )
-      :
-    ;;
-    "config load" )
+    "config init" )
       :
     ;;
     * )
-      fmt_echo "Unable to load context from $CONFIG_FILE"
-      fmt_echo "Run '$0 config init' or '$0 config reload -f {config_file}' to initialize $CONFIG_FILE"
-      false
+      echo
+      fmt_echo "Missing settings from $(basename "$CONFIG_FILE")"
+      fmt_echo "Settings are stored and sourced from local settings files in the following order of precedence:"
+      fmt_echo "  - \$PWD/.hive-settings.ini"
+      fmt_echo "  - \$HOME/.hive-settings.ini"
+      fmt_echo "Run 'hive config init' to initialize $(basename "$CONFIG_FILE")"
+      echo
+      exit 1
     ;;
   esac
 fi

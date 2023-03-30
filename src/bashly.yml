@@ -3,23 +3,23 @@ help: A single-pane toolbox for Docker Swarm
 version: 0.0.1
 
 environment_variables:
-- name: HIVE_SETTINGS
-  help: Settings file path
-  default: "$HOME/.hive-settings.ini"
 - name: DEBUG
-  help: Enable debug printing
+  help: Set 1 for basic, >1 for verbose
   default: "0"
 
 commands:
 - name: config
   help: Manage hive settings and behaviors
+  footer: |
+    Settings are stored and sourced from local settings files in the following
+    order of precedence:
+    - \$PWD/.hive-settings.ini
+    - \$HOME/.hive-settings.ini
   commands:
   - name: init
     help: Run the initial setup prompts retaining current settings as defaults
   - name: reload
-    help: >
-      Re-read settings file and re-execute necessary local configurations. Useful
-      if you copied settings files between systems
+    help: Read settings and execute necessary local configurations
   - name: show
     help: print saved settings and metadata
   - name: cluster
@@ -29,13 +29,13 @@ commands:
       help: Add a cluster
       args:
       - name: NAME
-        help: >
-          A unique identifying name refering to a Docker Swarm cluster, such as
+        help: |
+          A unique identifying name referring to a Docker Swarm cluster, such as
           "dev", "prod", "ci", etc
         required: true
         validate: context_name
       - name: MANAGER
-        help: >
+        help: |
           A hostname for a Swarm Manager node within the cluster; further
           managers can be autodiscovered with 'hive cluster discover'
         required: true
@@ -45,32 +45,33 @@ commands:
         short: -d
         help: Optional description of the cluster
     - name: discover
-      help: Discover neighbor managers of the current cluster manager
+      help: Discover neighbor managers
       flags:
       - long: --filter
         short: -f
         arg: FILTER
-        help: >
+        help: |
           Filter output based on conditions provided, equivalent to 'docker node
           ls --filter'; a filter of 'role=manager' is implicitly applied
     - name: ls
       help: List clusters
     - name: node-prune
-      help: Remove saved manager nodes absent from the current swarm cluster node list
+      help: Remove saved manager nodes absent from the current Swarm node list
       flags:
       - long: --all
         short: -a
-        help: >
-          Remove all manager nodes from the saved cluster data; WARNING-- you will need to
-          re-populate the saved cluster data with at least one manager via 'hive config
-          init' or 'hive config cluster update --add-node'
+        help: |
+          Remove all manager nodes from the saved cluster data; WARNING-- you
+          will need to re-populate the saved cluster data with at least one
+          manager via 'hive config init' or 'hive config cluster update
+          --add-node'
     - name: show
       help: Print current cluster setting information
       flags:
       - long: --field
         short: -f
         arg: FIELD
-        allowed: [all, cluster, name, nodetype, dockerhost]
+        allowed: [all, name, description, managers]
         default: name   
     - name: rm
       help: Remove a cluster from hive management
@@ -93,13 +94,13 @@ commands:
         short: -d
         help: New description of the cluster
       - long: --add-node
-        help: >
+        help: |
           A Swarm manager hostname to add to the cluster data; WARNING-- this
           will NOT prevent you from adding manager nodes from multiple Swarm
           clusters. For safety instead use 'hive config cluster discover' with a
           '--filter name='
       - long: --rm-node
-        help: >
+        help: |
           A Swarm manager hostname to remove from the cluster data; WARNING-- if
           you remove the last/only manager you will need to re-populate the
           cluster data with at least one manager via 'hive config init' or 'hive
@@ -167,28 +168,39 @@ commands:
     help: Manage ssh connection arguments, multiplexing, and host keys
     commands:
     - name: credential
-      help: Manage username and ssh private key file path configurations for DOCKER_HOST ssh sessions
-      footer: >
-        All hive ssh connections will use the credentials configured here.
-        Individual credentials per cluster are not supported. If you need
-        per-cluster credentials you can maintain a settings file per cluster.
-        You can specify alternate settings file paths with the HIVE_SETTINGS
-        environment variable
-      flags:
-      - long: --user
-        short: -u
-        arg: USER
-        help: The ssh username to be used in DOCKER_HOST ssh sessions (default current shell user)
-        default: $USER
-      - long: --identity-file
-        short: -i
-        arg: FILE
-        help: >
-          The path to the private key file for the given ssh user (default ssh
-          client private key search behavior is used if no identity-file is
-          supplied)
-      - long: --reload
-        help: Trigger a 'hive config reload' to apply updated ssh information to ssh multiplexing configs
+      help: Manage username and ssh private key file path for DOCKER_HOSTs
+      commands:
+      - name: show
+        help: Display currently configured ssh credential info
+      - name: update
+        help: Update ssh credential info
+        footer: |
+          All hive ssh connections will use the credentials configured here.
+          Individual credentials per cluster are not supported. If you need
+          per-cluster credentials you can maintain a settings file per cluster.
+          You can specify alternate settings file paths with the HIVE_SETTINGS
+          environment variable
+        flags:
+        - long: --user
+          short: -u
+          arg: USER
+          help: The ssh username to be used in DOCKER_HOST ssh sessions (default current shell user)
+          default: \$USER
+        - long: --identity-file
+          short: -i
+          arg: FILE
+          help: |
+            The path to the private key file for the given ssh user (default ssh
+            client private key search behavior is used if no identity-file is
+            supplied)
+        - long: --ssh-config
+          short: -s
+          arg: FILE
+          default: \$HOME/.ssh/config
+          help: |
+            The path to the ssh_config file for the given ssh user
+        - long: --reload
+          help: Trigger a 'hive config reload' to apply updated ssh information to ssh multiplexing configs
     - name: hostkeys
       help: Manage ssh host-keys for current cluster hosts
       commands:
@@ -196,41 +208,67 @@ commands:
         help: Remove all cluster host-keys
       - name: fetch
         help: Retrieve all cluster host-keys
+      - name: keyfile
+        help: Interact with the hive-managed ssh hostkey keyfile
+        footer: Default keyfile is located at \$HOME/.ssh/_hive_known_hosts
+        commands:
+        - name: del
+          help: Delete a keyfile entry by name
+          args:
+          - name: HOST
+            help: A hostname or IP
+        - name: show
+          help: Display keyfile information
+        - name: update
+          help: Change the hive-managed keyfile location
+          footer: Default keyfile is located at \$HOME/.ssh/_hive_known_hosts
+          flags:
+          - long: --path
+            short: -p
+            arg: PATH
+            help: Path to new keyfile location
+            validate: file_exists
+          - long: --hash-hosts
+            arg: BOOL
+            help: Set ssh HashKnownHosts value, triggers 'hive config ssh hostkeys refresh'
+            allowed: ["true", "false"]
       - name: refresh
         help: Alias for 'hive config ssh hostkeys expire && hive config ssh hostkeys fetch'
     - name: multiplex
       help: Manage connection mulitplexing for hive DOCKER_HOST ssh sessions
-      footer: Reference 'man ssh_config' for further information on ControlMaster configurations and options
       commands:
       - name: disable
-        help: Removes injected ssh multiplexing config from --ssh-config location
+        help: Removes injected ssh multiplexing from saved ssh_config location
       - name: enable
-        help: Inject ssh multiplexing config to --ssh-config location for hive DOCKER_HOSTs
-      - name: update-settings
-        help: Define ssh_config multiplexing settings
+        help: Inject ssh multiplexing to saved ssh_config location for hive DOCKER_HOSTs
+      - name: update
+        help: Update ssh_config multiplexing settings
+        footer: |
+          Reference 'man ssh_config' for further information on ControlMaster
+          configurations and options
         flags:
         - long: --ssh-config
           short: -s
           arg: PATH
-          help: Path to ssh config file for hive user (default $HOME/.ssh/config)
-          default: $HOME/.ssh/config
+          help: Path to ssh config file for hive user, defaults to value set in 'hive config ssh credential'
+          validate: file_exists
         - long: --control-path
           arg: PATH
-          help: Path and filename template string for ssh ControlMaster ControlPath socket files (default $HOME/.ssh/%%r@%%h.sock)
-          default: "$HOME/.ssh/%%r@%%h.sock"
+          help: Path and filename template string for ssh ControlMaster ControlPath socket files
+          default: \$HOME/.ssh/_hive_%r@%h.sock
         - long: --control-persist
           arg: DURATION
-          help: Duration to retain multiplexed ssh connection sockets (default 60m)
+          help: Duration to retain multiplexed ssh connection sockets
           default: 60m
         - long: --server-alive-interval
           arg: INT
-          help: Interval duration in seconds to send KeepAlive packets over the active ssh session (default 300)
+          help: Interval duration in seconds to send KeepAlive packets over the active ssh session
           default: "300"
           validate: integer
 - name: connect
-  help: Set current cluster to most recently used, set prompt injection if enabled, and initialize sessions
+  help: Restore cluster, prompt, and sessions
 - name: disconnect
-  help: Unset current cluster and prompt injection, and close open sessions
+  help: Unset current cluster and prompt, and close sessions
 - name: docker
   help: Docker management commands
   commands:
@@ -243,7 +281,7 @@ commands:
         required: true
     flags:
     - long: --container-parallel
-      help: >
+      help: |
         Restart all replica containers of each service simultaneously. Will
         disrupt service availability unless the service is configured with
         '--update-order "start-first"'
@@ -251,7 +289,7 @@ commands:
     help: Manage 'docker context' contexts
     commands:
     - name: discover
-      help: >
+      help: |
         Automatically create missing local 'docker context' entries from
         discovered and optionally filtered 'docker node ls' hosts
       footer: |
@@ -294,9 +332,8 @@ commands:
         help: Remove all contexts created by hive
   - name: exec
     help: Run a command in a running container located somewhere in the Swarm
-    footer: >
+    footer: |
       By default executes command equivalent to "docker exec -i -t CONTAINER COMMAND"
-      
       
       Makes a best-effort to resolve SERVICE to a child CONTAINER. If SERVICE
       has multiple child containers, the list of containers will be presented
@@ -312,13 +349,11 @@ commands:
     - long: --extra-opts
       short: -o
       arg: OPTS
-      help: A single string of extra command line flags corresponding to the available flags for 'docker exec'
-      default: '-i -t'
+      help: A single string of extra command line flags corresponding to the available flags for 'docker exec'. The flags '-i -t' are always implicitly applied.
   - name: host-exec
     help: Run a command on the host running a target container
-    footer: >
+    footer: |
       Executes command equivalent to 'ssh -t CONTAINER_HOST bash -l -c "COMMAND"'
-      
       
       Makes a best-effort to resolve SERVICE to a child container to determine
       CONTAINER_HOST. If SERVICE has multiple child containers, the list of
@@ -368,10 +403,11 @@ commands:
       help: Pretty-print containers using a Go template, equivalent to 'docker image ls --format'
   - name: inspect
     help: Return low-level information on Docker objects
-    footer: >
-      Searches all objects and across all nodes by default. Different types of objects can have
-      the same name, and same types of objects can have the same name across different nodes,
-      making lookups without --type and --node restrictions potentially ambiguous
+    footer: |
+      Searches all objects and across all nodes by default. Different types of
+      objects can have the same name, and same types of objects can have the
+      same name across different nodes, making lookups without --type and --node
+      restrictions potentially ambiguous
     args:
     - name: OBJECT
       help: A docker object such as a service name, container ID, node hostname, image , etc
@@ -405,13 +441,13 @@ commands:
     - long: --tail
       short: -n
       arg: TAIL
-      help: Number of lines to show from the end of each log stream (default 100)
+      help: Number of lines to show from the end of each log stream
       default: "100"
       validate: integer
     - long: --max-streams
       short: -m
       arg: MAX_STREAMS
-      help: Max allowed number of parallel streams, to protect the Docker daemon from excess throughput (default 6)
+      help: Max allowed number of parallel streams, to protect the Docker daemon from excess throughput
       default: "6"
       validate: integer
     - long: --extra-opts
@@ -458,7 +494,7 @@ commands:
       - docker node update --availability=active NODE
     args:
     - name: CONTAINER
-      help: >
+      help: |
         A container name or ID. Will NOT accept a service name or ID. Will
         attempt to resolve the container host, but in the case of ambiguous
         container name command will exit with error
@@ -467,6 +503,6 @@ commands:
     - long: --node
       short: -n
       arg: NODE
-      help: >
+      help: |
         Restricts the container lookup to container present on given NODE, where
         NODE matches a 'docker node ls' hostname  

@@ -1,14 +1,10 @@
 
 load_settings() {
-    ## Load settings file if it exists
-    ## Initialize settings file if does not exist
-    if [ ! -f "$CONFIG_FILE" ]; then
-        initialize_settings
-    fi
+    ## initialize any missing settings
+    initialize_settings all
     
     case "$action" in
       "config init" )
-      
         :
       ;;
       "config load"* | "config reload" )
