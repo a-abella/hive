@@ -1,14 +1,12 @@
 # shellcheck disable=SC2168
-echo "# this file is located in 'src/config_init_command.sh'"
-echo "# code for 'hive config init' goes here"
-echo "# you can edit it freely and regenerate (it will not be overwritten)"
-inspect_args
+# echo "# this file is located in 'src/config_init_command.sh'"
+# echo "# code for 'hive config init' goes here"
+# echo "# you can edit it freely and regenerate (it will not be overwritten)"
+# inspect_args
 
 config_eval() {
-  dbg_echo "CURRENT_CLUSTER_LEN=${#CURRENT_CLUSTER[@]}"
   declare -A user_input
   if [[ ! "${CURRENT_CLUSTER[*]}" ]]; then
-    echo
     dbg_echo "running config_init_cluster"
     config_init_cluster
     local RAN_INIT_CLUSTER=1
@@ -22,6 +20,9 @@ config_init_cluster() {
   echo
   fmt_echo "Set an identifying cluster name"
   read -p "  name: " user_input[cluster_name]
+  echo
+  fmt_echo "Clusters can have optional descriptions"
+  read -p "  description: " user_input[cluster_desc]
   
   echo
   fmt_echo "Hive needs to know a Swarm manager hostname or address belonging to this cluster to interact with services and nodes; more managers can be added or autodiscovered later"
@@ -71,18 +72,36 @@ config_init_ssh() {
   echo
   fmt_echo "The following SSH configurations will be applied based on your selections:"
   echo
-  echo "# The file ${user_input[ssh_config]}_hive will be created"
+  local hive_ssh_config_file="${user_input[ssh_config]}_hive"
+  echo "# The file $hive_ssh_config_file will be created"
   echo "# with the following content:"
-  local SSH_CONFIG_HIVE
-  SSH_CONFIG_HIVE="Host ${user_input[cluster_manager]}
-  User ${user_input[ssh_user]}
-  IdentityFile ${user_input[ssh_identity]}
-  ControlMaster $([[ "${user_input[ssh_multiplex_enable]}" =~ ^[yY][eE]?[sS]?$ ]] && echo Auto || echo no)
-  ControlPath ${user_input[ssh_multiplex_controlpath]}
-  ControlPersist ${user_input[ssh_multiplex_controlpersist]}
-  ServerAliveInterval ${user_input[ssh_multiplex_aliveinterval]}"
   echo
-  cat <<< "$SSH_CONFIG_HIVE"
+  local ssh_config_hive
+  ssh_config_hive="
+Host ${user_input[cluster_manager]}
+  # the user used to ssh to swarm nodes
+  User ${user_input[ssh_user]}
+  # private key for the given user
+  IdentityFile ${user_input[ssh_identity]}
+  # enable multiplexing (yes|auto = enabled, no = disabled)
+  ControlMaster $([[ "${user_input[ssh_multiplex_enable]}" =~ ^[yY][eE]?[sS]?$ ]] && echo Auto || echo no)
+  # location and template for multiplexing ssh sockets
+  ControlPath ${user_input[ssh_multiplex_controlpath]}
+  # duration to retain open sockets
+  ControlPersist ${user_input[ssh_multiplex_controlpersist]}
+  # interval to send keepalive signals
+  ServerAliveInterval ${user_input[ssh_multiplex_aliveinterval]}"
+  tee "$hive_ssh_config_file" <<< "$ssh_config_hive"
+  echo
+  echo
+  echo "# The following line will be appended"
+  echo "# to ${user_input[ssh_config]}:"
+  echo
+  local import_ssh_config_hive=$'\n'"Include \"$hive_ssh_config\""
+  tee "${user_input[ssh_config]}" <<< "$import_ssh_config_hive"
+  echo
+  
+  
 }
 
 config_init_prompt() {
@@ -90,6 +109,5 @@ config_init_prompt() {
 }
 
 #clear
-fmt_echo "Initializing $CONFIG_FILE"
 config_eval
 

@@ -6,7 +6,7 @@
 ## You can safely delete this file if you do not need it.
 echo "==[ Before Hook Called ]=="
 dbg_echo "action: $action"
-inspect_args
+# inspect_args
 if [[ $DEBUG -gt 1 ]]; then
   ( set -o posix ; set | sed -e 's/^/_before__/' )
 fi

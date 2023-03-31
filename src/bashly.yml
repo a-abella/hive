@@ -1,5 +1,5 @@
 name: hive
-help: A single-pane toolbox for Docker Swarm
+help: A single-pane toolbox for Docker Swarm clusters
 version: 0.0.1
 
 dependencies: [docker, jq, ssh]
@@ -16,6 +16,7 @@ commands:
     Settings are stored and sourced from local settings files in the following
     order of precedence:
     - \$PWD/.hive-settings.ini
+    - \${hive_location}/.hive-settings.ini
     - \$HOME/.hive-settings.ini
   commands:
   - name: init
@@ -114,18 +115,12 @@ commands:
         help: Cluster name
         required: true
   - name: prompt
-    help: Configure PS1 and output-prefix prompt injection
+    help: Configure PS1 prompt injection
     commands:
       - name: disable
         help: Turn off prompt injection
-        flags:
-        - long: --output-prefix
-          help: Disable prefix of prompt on 'hive docker' command output
       - name: enable
         help: Turn on prompt injection
-        flags:
-        - long: --output-prefix
-          help: Prefixes all 'hive docker' command output with the prompt
       - name: update
         help: Set prompt template
         footer: |
@@ -136,32 +131,23 @@ commands:
           - {CLUSTER}     The current hive cluster name
           - {MANAGER}     The currently selected cluster manager receiving
                             Swarm commands
-          - {DOCKERHOST}  The hostname of the Docker host currently executing
-                            Docker commands; only relevant when output-prefix
-                            is enabled
                             
           Additionally, template variables may be piped to a shell command for
-          modification. For example:
-          - {DOCKERHOST|cut -d'.' -f1}
+            modification. For example:
+          - {MANAGER|cut -d'.' -f1}
           - {CLUSTER|tr A-Z a-z}
           
           Curly braces within a template variable body must be escaped
           
-          The PS1 prompt type can additionally use caret (^) and dollar-sign ($)
-          characters with special meaning:
+          The prompt can additionally use caret (^) and dollar-sign ($) characters
+            with special meaning:
           - ^   A caret as the FIRST character of a template indicates that the
                   prompt will be PREPENDED to the PS1 environment variable
           - $   A dollar-sign as the LAST character of a template indicates that the
                   prompt will be APPENDED to the PS1 environment variable
           
-          The default templates for each prompt type are:
-          - PS1             "^({CLUSTER}) "
-          - output-prefix   "({CLUSTER} {DOCKERHOST|cut -d'.' -f1})  "
+          The default template is: "^({CLUSTER}) "
         args:
-        - name: PROMPT
-          help: Select which prompt to apply the template
-          allowed: [PS1, output-prefix]
-          required: true
         - name: TEMPLATE
           help: Template string to apply
           required: true

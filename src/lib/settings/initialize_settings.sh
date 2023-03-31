@@ -72,17 +72,13 @@ initialize_ssh_settings() {
 initialize_prompt_settings() {
     # shellcheck disable=SC2034
     declare -A setting_map=(
-      [prompt_ps1_enabled]="true"
-      [prompt_output_prefix_enabled]="false"
-      [prompt_template_ps1]="'^({CLUSTER}) '"
-      [prompt_template_output_prefix]="'({CLUSTER} {DOCKERHOST|cut -d'.' -f1})'"
+      [prompt_enabled]="true"
+      [prompt_template]="'^({CLUSTER}) '"
     )
     # shellcheck disable=SC2034
     declare -A -g prompt_desc_map=(
-      [prompt_ps1_enabled]="; Enable shell PS1 prompt template injection (true | false)"
-      [prompt_output_prefix_enabled]="; Enable hive command output prompt template prefix injection (true | false)"
-      [prompt_template_ps1]="; PS1 prompt template string, refer to 'hive config prompt update --help'"
-      [prompt_template_output_prefix]="; Output prefix template string, refer to 'hive config prompt update --help"
+      [prompt_enabled]="; Enable shell PS1 prompt template injection (true | false)"
+      [prompt_template]="; PS1 prompt template string, refer to 'hive config prompt update --help'"
     )
     write_conf_items setting_map prompt_desc_map
 }

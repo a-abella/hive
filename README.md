@@ -1,4 +1,4 @@
-# Hive - A single-pane toolbox for Docker Swarm
+# Hive - A single-pane toolbox for Docker Swarm clusters
 Powered by `bashly`
 
 🚧 Doesn't do much of anything yet. 🚧
