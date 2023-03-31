@@ -2,6 +2,8 @@ name: hive
 help: A single-pane toolbox for Docker Swarm
 version: 0.0.1
 
+dependencies: [docker, jq, ssh]
+
 environment_variables:
 - name: DEBUG
   help: Set 1 for basic, >1 for verbose

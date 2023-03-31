@@ -57,6 +57,8 @@ config_set() {
       output="$output$newline\n"
     elif [[ $line ]]; then
       output="$output$line\n"
+    else
+      output="$output$line\n"
     fi
   done <"$CONFIG_FILE"
 
@@ -78,7 +80,8 @@ config_del() {
   config_init
 
   while IFS= read -r line || [ -n "$line" ]; do
-    if [[ $line ]] && [[ ! $line =~ $regex ]]; then
+    if [[ ! $line =~ $regex ]]; then
+    #if [[ $line ]] && [[ ! $line =~ $regex ]]; then
       output="$output$line\n"
     fi
   done <"$CONFIG_FILE"

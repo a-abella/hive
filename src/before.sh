@@ -31,4 +31,5 @@ if ! config_has_key cluster_current ; then
   esac
 fi
 
+## sets ${CURRENT_CLUSTER[name|desc|mgs]}
 load_hive_cluster
