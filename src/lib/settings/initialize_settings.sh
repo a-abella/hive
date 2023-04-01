@@ -42,8 +42,10 @@ write_conf_items() {
 initialize_ssh_settings() {
     # shellcheck disable=SC2034
     declare -A setting_map=(
-      [ssh_credential_user]="$USER"
+      [ssh_config_manage]="false"
       [ssh_config_file]="$HOME/.ssh/config"
+      [ssh_config_priority]="after"
+      [ssh_credential_user]="$USER"
       [ssh_credential_identity_file]=""
       [ssh_keyfile_path]="$HOME/.ssh/_hive_known_hosts"
       [ssh_keyfile_hashknownhosts]="yes"
@@ -54,8 +56,10 @@ initialize_ssh_settings() {
     )
     # shellcheck disable=SC2034
     declare -A -g ssh_desc_map=(
-      [ssh_credential_user]="; The ssh username to be used in DOCKER_HOST ssh sessions"
+      [ssh_config_manage]="; Allow hive to manage ssh_config settings"
       [ssh_config_file]="; Path to the ssh_credential_user's ssh_config file, usually \$HOME/.ssh/config"
+      [ssh_config_priority]="; Place hive-managed ssh_config either BEFORE or AFTER user-managed settings (before | after)\n;; ssh_config values are used on a first-match basis"
+      [ssh_credential_user]="; The ssh username to be used in DOCKER_HOST ssh sessions"
       [ssh_credential_identity_file]="; Path to the private key file for the given ssh user,\n;; if left blank default ssh key search behavior is used"
       [ssh_keyfile_path]="; Path to the hive-managed known_hosts keyfile location"
       [ssh_keyfile_hashknownhosts]="; Sets ssh HashKnownHosts value"

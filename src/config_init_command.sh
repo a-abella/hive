@@ -113,8 +113,10 @@ config_init_ssh() {
   echo "# with the following content:"
   echo
 
-  local ssh_config_hive_printf_b64="SG9zdCAlcwogICMgdGhlIHVzZXIgdXNlZCB0byBzc2ggdG8gc3dhcm0gbm9kZXMKICBVc2VyICVzCiAgIyBwcml2YXRlIGtleSBmb3IgdGhlIGdpdmVuIHVzZXIKICBJZGVudGl0eUZpbGUgJXMKICAjIGVuYWJsZSBtdWx0aXBsZXhpbmcgKHllc3xhdXRvID0gZW5hYmxlZCwgbm8gPSBkaXNhYmxlZCkKICBDb250cm9sTWFzdGVyICVzCiAgIyBsb2NhdGlvbiBhbmQgdGVtcGxhdGUgZm9yIG11bHRpcGxleGluZyBzc2ggc29ja2V0cwogIENvbnRyb2xQYXRoICVzCiAgIyBkdXJhdGlvbiB0byByZXRhaW4gb3BlbiBzb2NrZXRzCiAgQ29udHJvbFBlcnNpc3QgJXMKICAjIGludGVydmFsIHRvIHNlbmQga2VlcGFsaXZlIHNpZ25hbHMKICBTZXJ2ZXJBbGl2ZUludGVydmFsICVzCg=="
+  local ssh_config_hive_printf_b64="SG9zdCAlcwogICMgdGhlIHVzZXIgdXNlZCB0byBzc2ggdG8gc3dhcm0gbm9kZXMKICBVc2VyICVzCiAgIyBwcml2YXRlIGtleSBmb3IgdGhlIGdpdmVuIHVzZXIKICBJZGVudGl0eUZpbGUgJXMKICAjIGVuYWJsZSBtdWx0aXBsZXhpbmcgKHllc3xhdXRvID0gZW5hYmxlZCwgbm8gPSBkaXNhYmxlZCkKICBDb250cm9sTWFzdGVyICVzCiAgIyBsb2NhdGlvbiBhbmQgdGVtcGxhdGUgZm9yIG11bHRpcGxleGluZyBzc2ggc29ja2V0cwogIENvbnRyb2xQYXRoICVzCiAgIyBkdXJhdGlvbiB0byByZXRhaW4gb3BlbiBzb2NrZXRzCiAgQ29udHJvbFBlcnNpc3QgJXMKICAjIGludGVydmFsIHRvIHNlbmQga2VlcGFsaXZlIHNpZ25hbHMKICBTZXJ2ZXJBbGl2ZUludGVydmFsICVzCiAgIyB3aGVyZSB0byBzdG9yZSBoaXZlLW1hbmFnZWQgaG9zdGtleXMKICBVc2VLbm93bkhvc3RzRmlsZSAlcwogICMgY29udHJvbCBob3N0a2V5IGhhc2hpbmcKICBIYXNoS25vd25Ib3N0cyAlcwoK"
   ## ssh_config_give_printf_b64 resolves to a printf string that will ultimately resembe the following:
+  ## have to use base64+printf because bashly's handling of heredocs is broken
+  ##
   ## Host ${user_input["cluster_manager"]}
   ##   # the user used to ssh to swarm nodes
   ##   User ${user_input["ssh_user"]}
@@ -127,18 +129,45 @@ config_init_ssh() {
   ##   # duration to retain open sockets
   ##   ControlPersist ${user_input["ssh_multiplex_controlpersist"]}
   ##   # interval to send keepalive signals
-  ##   ServerAliveInterval ${user_input["ssh_multiplex_aliveinterval"]}"
+  ##   ServerAliveInterval ${user_input["ssh_multiplex_aliveinterval"]}
+  ##   # where to store hive-managed hostkeys
+  ##   UseKnownHostsFile ${user_input["ssh_keyfile"]}
+  ##   # control hostkey hashing
+  ##   HashKnownHosts ${user_input["ssh_hashknownhosts"]}
   
   # shellcheck disable=SC2059
-  printf "$(base64 -d <<< "$ssh_config_hive_printf_b64")" "${user_input["cluster_manager"]}" "${user_input["ssh_user"]}" "${user_input["ssh_identity"]}" "$([[ "${user_input["ssh_multiplex_enable"]}" =~ ^[yY][eE]?[sS]?$ ]] && echo Auto || echo no)" "${user_input["ssh_multiplex_controlpath"]}" "${user_input["ssh_multiplex_controlpersist"]}" "${user_input["ssh_multiplex_aliveinterval"]}" | tee "$hive_ssh_config_file"
-  tee "$hive_ssh_config_file" <<< "$( base64 -d <<< "$ssh_config_hive_b64")"
+  printf "$(base64 -d <<< "$ssh_config_hive_printf_b64")" "${user_input["cluster_manager"]}" "${user_input["ssh_user"]}" "${user_input["ssh_identity"]}" "$([[ "${user_input["ssh_multiplex_enable"]}" =~ ^[yY][eE]?[sS]?$ ]] && echo Auto || echo no)" "${user_input["ssh_multiplex_controlpath"]}" "${user_input["ssh_multiplex_controlpersist"]}" "${user_input["ssh_multiplex_aliveinterval"]}" "${user_input["ssh_keyfile"]}" "${user_input["ssh_hashknownhosts"]}" | tee "$hive_ssh_config_file"
   echo
   echo
-  echo "# The following line will be appended"
-  echo "# to ${user_input["ssh_config"]}:"
-  echo
-  local import_ssh_config_hive=$'\n'"Include \"$hive_ssh_config\""
-  tee "${user_input["ssh_config"]}" <<< "$import_ssh_config_hive"
+  local hive_include="Include \"$hive_ssh_config\""
+  local base_config_content
+  base_config_content="$(grep -v "$hive_include" "$(config_get ssh_config_file)")"
+  if [[ "$(config_get ssh_config_manage | tr '[:upper:]' '[:lower:]')" =~ ^(y|yes|true|1)$ ]]; then
+    echo "# Hive will write the following"
+    echo "# to ${user_input["ssh_config"]}:"
+    echo
+    local ssh_config_prio
+    ssh_config_prio="$(config_get ssh_config_priority | tr '[:upper:]' '[:lower:]')"
+    local l
+    local ssh_config_content
+    if [[ "$ssh_config_prio" = "before" ]]; then
+      l="$(head -n1 <<< "$base_config_content")"
+      [[ "${l// }" ]] && local blank='\n\n' || local blank='\n'
+      # shellcheck disable=SC2001
+      ssh_config_content="$(sed "1 s/^/$hive_include$blank/" <<< "$base_config_content")"
+    elif [[  "$ssh_config_prio" = "after" ]]; then
+      l="$(tail -n1 <<< "$base_config_content")"
+      [[ "${l// }" ]] && local blank=$'\n\n' || local blank=$'\n'
+      ssh_config_content="$base_config_content$blank$hive_include"
+    else
+      fmt_echo "ERROR: invalid settings value for ssh_config_priority"
+      false
+    fi
+    tee "$(config_get ssh_config_file)" <<< "$ssh_config_content"
+  else
+    echo -e "$base_config_content" > "$(config_get ssh_config_file)"
+  fi
+  #tee "${user_input["ssh_config"]}" <<< "$import_ssh_config_hive"
   echo
   
   
