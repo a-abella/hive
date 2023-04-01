@@ -1,3 +1,3 @@
 dbg_echo() {
-  (( DEBUG )) && echo "DEBUG | $*" || true
+  (( DEBUG )) && while IFS= read -r line ; do echo "DEBUG | $line" ;  done <<< "$*" || true
 }

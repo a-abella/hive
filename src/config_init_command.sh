@@ -6,6 +6,7 @@
 
 config_eval() {
   declare -A user_input
+  dbg_echo "$(printarr CURRENT_CLUSTER)"
   if [[ ! "${CURRENT_CLUSTER[*]}" || "${args[--reset-clusters]}" ]]; then
     dbg_echo "running config_init_cluster"
     print_banner "tagline"
@@ -21,6 +22,9 @@ initialize_cluster_context() {
   local j="{\"$1\": {\"desc\": \"$2\", \"managers\": [\"$3\"]}}"
   config_set cluster_map "$j"
   config_set cluster_current "$1"
+  load_hive_cluster
+  dbg_echo "INITIALIZED AND LOADED CLUSTER DATA"
+  dbg_echo "$(printarr CURRENT_CLUSTER)"
 }
 
 config_init_cluster() {
@@ -108,22 +112,23 @@ config_init_ssh() {
   echo "# The file $hive_ssh_config_file will be created"
   echo "# with the following content:"
   echo
-  #local ssh_config_hive
-  ssh_config_hive_printf_b64="SG9zdCAlcwogICMgdGhlIHVzZXIgdXNlZCB0byBzc2ggdG8gc3dhcm0gbm9kZXMKICBVc2VyICVzCiAgIyBwcml2YXRlIGtleSBmb3IgdGhlIGdpdmVuIHVzZXIKICBJZGVudGl0eUZpbGUgJXMKICAjIGVuYWJsZSBtdWx0aXBsZXhpbmcgKHllc3xhdXRvID0gZW5hYmxlZCwgbm8gPSBkaXNhYmxlZCkKICBDb250cm9sTWFzdGVyICVzCiAgIyBsb2NhdGlvbiBhbmQgdGVtcGxhdGUgZm9yIG11bHRpcGxleGluZyBzc2ggc29ja2V0cwogIENvbnRyb2xQYXRoICVzCiAgIyBkdXJhdGlvbiB0byByZXRhaW4gb3BlbiBzb2NrZXRzCiAgQ29udHJvbFBlcnNpc3QgJXMKICAjIGludGVydmFsIHRvIHNlbmQga2VlcGFsaXZlIHNpZ25hbHMKICBTZXJ2ZXJBbGl2ZUludGVydmFsICVzCg=="
-#   ssh_config_hive="
-# Host ${user_input["cluster_manager"]}
-#   # the user used to ssh to swarm nodes
-#   User ${user_input["ssh_user"]}
-#   # private key for the given user
-#   IdentityFile ${user_input["ssh_identity"]}
-#   # enable multiplexing (yes|auto = enabled, no = disabled)
-#   ControlMaster $([[ "${user_input["ssh_multiplex_enable"]}" =~ ^[yY][eE]?[sS]?$ ]] && echo Auto || echo no)
-#   # location and template for multiplexing ssh sockets
-#   ControlPath ${user_input["ssh_multiplex_controlpath"]}
-#   # duration to retain open sockets
-#   ControlPersist ${user_input["ssh_multiplex_controlpersist"]}
-#   # interval to send keepalive signals
-#   ServerAliveInterval ${user_input["ssh_multiplex_aliveinterval"]}"
+
+  local ssh_config_hive_printf_b64="SG9zdCAlcwogICMgdGhlIHVzZXIgdXNlZCB0byBzc2ggdG8gc3dhcm0gbm9kZXMKICBVc2VyICVzCiAgIyBwcml2YXRlIGtleSBmb3IgdGhlIGdpdmVuIHVzZXIKICBJZGVudGl0eUZpbGUgJXMKICAjIGVuYWJsZSBtdWx0aXBsZXhpbmcgKHllc3xhdXRvID0gZW5hYmxlZCwgbm8gPSBkaXNhYmxlZCkKICBDb250cm9sTWFzdGVyICVzCiAgIyBsb2NhdGlvbiBhbmQgdGVtcGxhdGUgZm9yIG11bHRpcGxleGluZyBzc2ggc29ja2V0cwogIENvbnRyb2xQYXRoICVzCiAgIyBkdXJhdGlvbiB0byByZXRhaW4gb3BlbiBzb2NrZXRzCiAgQ29udHJvbFBlcnNpc3QgJXMKICAjIGludGVydmFsIHRvIHNlbmQga2VlcGFsaXZlIHNpZ25hbHMKICBTZXJ2ZXJBbGl2ZUludGVydmFsICVzCg=="
+  ## ssh_config_give_printf_b64 resolves to a printf string that will ultimately resembe the following:
+  ## Host ${user_input["cluster_manager"]}
+  ##   # the user used to ssh to swarm nodes
+  ##   User ${user_input["ssh_user"]}
+  ##   # private key for the given user
+  ##   IdentityFile ${user_input["ssh_identity"]}
+  ##   # enable multiplexing (yes|auto = enabled, no = disabled)
+  ##   ControlMaster $([[ "${user_input["ssh_multiplex_enable"]}" =~ ^[yY][eE]?[sS]?$ ]] && echo Auto || echo no)
+  ##   # location and template for multiplexing ssh sockets
+  ##   ControlPath ${user_input["ssh_multiplex_controlpath"]}
+  ##   # duration to retain open sockets
+  ##   ControlPersist ${user_input["ssh_multiplex_controlpersist"]}
+  ##   # interval to send keepalive signals
+  ##   ServerAliveInterval ${user_input["ssh_multiplex_aliveinterval"]}"
+  
   # shellcheck disable=SC2059
   printf "$(base64 -d <<< "$ssh_config_hive_printf_b64")" "${user_input["cluster_manager"]}" "${user_input["ssh_user"]}" "${user_input["ssh_identity"]}" "$([[ "${user_input["ssh_multiplex_enable"]}" =~ ^[yY][eE]?[sS]?$ ]] && echo Auto || echo no)" "${user_input["ssh_multiplex_controlpath"]}" "${user_input["ssh_multiplex_controlpersist"]}" "${user_input["ssh_multiplex_aliveinterval"]}" | tee "$hive_ssh_config_file"
   tee "$hive_ssh_config_file" <<< "$( base64 -d <<< "$ssh_config_hive_b64")"
@@ -140,6 +145,9 @@ config_init_ssh() {
 }
 
 config_init_prompt() {
+  fmt_echo "Define your prompt injection!"
+  echo
+  fmt_echo "Hive can inject a template into your PS1 prompt to show which cluster you are actively managing. This prompt is customizable using a templating system. See \`hive config prompt update --help\` for template syntax information"
   :
 }
 
