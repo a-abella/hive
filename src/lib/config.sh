@@ -44,7 +44,8 @@ config_set() {
 
   config_init
 
-  local regex="^($key) *= *.+$"
+  #local regex="^($key) *= *.+$"
+  local regex="^($key) *= *.*$"
   local output=""
   local found_key=""
   local newline
@@ -54,16 +55,16 @@ config_set() {
     if [[ $line =~ $regex ]]; then
       found_key="${BASH_REMATCH[1]}"
       newline="$key = $value"
-      output="$output$newline\n"
+      output="$output$newline\n\n"
+    elif [[ "${line: 0:1}" = ";" ]]; then
+      output="$output$line\n"
     elif [[ $line ]]; then
-      output="$output$line\n"
-    else
-      output="$output$line\n"
+      output="$output$line\n\n"
     fi
   done <"$CONFIG_FILE"
 
   if [[ -z $found_key ]]; then
-    output="$output$key = $value\n"
+    output="$output$key = $value\n\n"
   fi
 
   printf "%b\n" "$output" >"$CONFIG_FILE"
@@ -80,8 +81,7 @@ config_del() {
   config_init
 
   while IFS= read -r line || [ -n "$line" ]; do
-    if [[ ! $line =~ $regex ]]; then
-    #if [[ $line ]] && [[ ! $line =~ $regex ]]; then
+    if [[ $line ]] && [[ ! $line =~ $regex ]]; then
       output="$output$line\n"
     fi
   done <"$CONFIG_FILE"
