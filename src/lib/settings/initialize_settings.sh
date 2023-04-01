@@ -56,7 +56,7 @@ initialize_ssh_settings() {
     declare -A -g ssh_desc_map=(
       [ssh_credential_user]="; The ssh username to be used in DOCKER_HOST ssh sessions"
       [ssh_config_file]="; Path to the ssh_credential_user's ssh_config file, usually \$HOME/.ssh/config"
-      [ssh_credential_identity_file]="; Path to the private key file for the given ssh user,\n;; if left blank default ssh client key search behavior is used"
+      [ssh_credential_identity_file]="; Path to the private key file for the given ssh user,\n;; if left blank default ssh key search behavior is used"
       [ssh_keyfile_path]="; Path to the hive-managed known_hosts keyfile location"
       [ssh_keyfile_hashknownhosts]="; Sets ssh HashKnownHosts value"
       [ssh_multiplex_enabled]="; Inject ssh multiplexing to sshconfig location for DOCKER_HOSTs (true | false)\n;; Reference 'man ssh_config' for further information on ControlMaster configurations and options"
@@ -87,12 +87,12 @@ initialize_cluster_settings() {
     # shellcheck disable=SC2034
     declare -A setting_map=(
       [cluster_current]=""
-      [cluster_list]=""
+      [cluster_map]=""
     )
     # shellcheck disable=SC2034
     declare -A -g cluster_desc_map=(
       [cluster_current]="; The currently selected hive cluster"
-      [cluster_list]="; Cluster metadata for hive management"
+      [cluster_map]="; Cluster metadata for hive management"
     )
     write_conf_items setting_map cluster_desc_map
 }

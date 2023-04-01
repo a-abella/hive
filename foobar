@@ -1,0 +1,14 @@
+
+Host ${user_input[cluster_manager]}
+  # the user used to ssh to swarm nodes
+  User ${user_input[ssh_user]}
+  # private key for the given user
+  IdentityFile ${user_input[ssh_identity]}
+  # enable multiplexing (yes|auto = enabled, no = disabled)
+  ControlMaster $([[ "${user_input[ssh_multiplex_enable]}" =~ ^[yY][eE]?[sS]?$ ]] && echo Auto || echo no)
+  # location and template for multiplexing ssh sockets
+  ControlPath ${user_input[ssh_multiplex_controlpath]}
+  # duration to retain open sockets
+  ControlPersist ${user_input[ssh_multiplex_controlpersist]}
+  # interval to send keepalive signals
+  ServerAliveInterval ${user_input[ssh_multiplex_aliveinterval]}

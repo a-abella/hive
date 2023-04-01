@@ -21,6 +21,9 @@ commands:
   commands:
   - name: init
     help: Run the initial setup prompts retaining current settings as defaults
+    flags:
+    - long: --reset-clusters
+      help: Allows cluster settings to be overridden
   - name: reload
     help: Read settings and execute necessary local configurations
   - name: show
