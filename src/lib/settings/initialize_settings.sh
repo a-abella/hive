@@ -5,15 +5,11 @@ initialize_settings() {
     cluster )
       initialize_cluster_settings
     ;;
-    prompt )
-      initialize_prompt_settings
-    ;;
     ssh )
       initialize_ssh_settings
     ;;
     all )
       initialize_ssh_settings
-      initialize_prompt_settings
       initialize_cluster_settings
     ;;
     * )
@@ -47,7 +43,7 @@ initialize_ssh_settings() {
       [ssh_config_priority]="after"
       [ssh_credential_user]="$USER"
       [ssh_credential_identity_file]=""
-      [ssh_keyfile_path]="$HOME/.ssh/_hive_known_hosts"
+      [ssh_keyfile_path]="$HOME/.ssh/hive_known_hosts"
       [ssh_keyfile_hashknownhosts]="yes"
       [ssh_multiplex_enabled]="true"
       [ssh_multiplex_controlpath]="$HOME/.ssh/_hive_%r@%h.sock"
@@ -71,20 +67,6 @@ initialize_ssh_settings() {
     )
     
     write_conf_items setting_map ssh_desc_map
-}
-
-initialize_prompt_settings() {
-    # shellcheck disable=SC2034
-    declare -A setting_map=(
-      [prompt_enabled]="true"
-      [prompt_template]="'^({CLUSTER}) '"
-    )
-    # shellcheck disable=SC2034
-    declare -A -g prompt_desc_map=(
-      [prompt_enabled]="; Enable shell PS1 prompt template injection (true | false)"
-      [prompt_template]="; PS1 prompt template string, refer to 'hive config prompt update --help'"
-    )
-    write_conf_items setting_map prompt_desc_map
 }
 
 initialize_cluster_settings() {

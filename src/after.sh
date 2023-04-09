@@ -4,7 +4,7 @@
 ## after running any command.
 ##
 ## You can safely delete this file if you do not need it.
-echo "==[ After Hook Called ]=="
+# echo "==[ After Hook Called ]=="
 # inspect_args
 
 if [[ $DEBUG -gt 1 ]]; then

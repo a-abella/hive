@@ -45,7 +45,7 @@ commands:
           A hostname for a Swarm Manager node within the cluster; further
           managers can be autodiscovered with 'hive cluster discover'
         required: true
-        validate: context_host
+        validate: cluster_host
       flags:
       - long: --description
         short: -d
@@ -118,43 +118,11 @@ commands:
         help: Cluster name
         required: true
   - name: prompt
-    help: Configure PS1 prompt injection
-    commands:
-      - name: disable
-        help: Turn off prompt injection
-      - name: enable
-        help: Turn on prompt injection
-      - name: update
-        help: Set prompt template
-        footer: |
-          Prompt template strings may use special template variables in the
-          form {VARIABLE}
-          
-          The following template variables are available:
-          - {CLUSTER}     The current hive cluster name
-          - {MANAGER}     The currently selected cluster manager receiving
-                            Swarm commands
-                            
-          Additionally, template variables may be piped to a shell command for
-            modification. For example:
-          - {MANAGER|cut -d'.' -f1}
-          - {CLUSTER|tr A-Z a-z}
-          
-          Curly braces within a template variable body must be escaped
-          
-          The prompt can additionally use caret (^) and dollar-sign ($) characters
-            with special meaning:
-          - ^   A caret as the FIRST character of a template indicates that the
-                  prompt will be PREPENDED to the PS1 environment variable
-          - $   A dollar-sign as the LAST character of a template indicates that the
-                  prompt will be APPENDED to the PS1 environment variable
-          
-          The default template is: "^({CLUSTER}) "
-        args:
-        - name: TEMPLATE
-          help: Template string to apply
-          required: true
-          validate: parse_prompt
+    help: Emit current-cluster PS1 prompt strings to be used with 'eval'
+    args:
+      - name: TOGGLE
+        help: Print strings to modify or revert PS1 prompt
+        allowed: [enable, disable]
   - name: ssh
     help: Manage ssh connection arguments, multiplexing, and host keys
     commands:

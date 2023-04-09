@@ -16,6 +16,15 @@ config_eval() {
   fi
   echo; config_init_ssh
   echo; config_init_prompt
+  sec_head "Initial setup is complete!"
+  echo
+  fmt_echo "Try a command like 'hive docker ps' to execute against your configured cluster!"
+}
+
+sec_head() {
+  echo "##"
+  echo "## $*"
+  echo "##"
 }
 
 initialize_cluster_context() {
@@ -28,7 +37,9 @@ initialize_cluster_context() {
 }
 
 config_init_cluster() {
-  fmt_echo "Define your first cluster!"
+  sec_head "Define your first cluster!"
+  echo
+  fmt_echo "Hive stores cluster data in you local config file. This will guide you through setting up your first cluster."
   echo
   fmt_echo "Set an identifying cluster name"
   read -p "  name: " user_input["cluster_name"]
@@ -37,18 +48,33 @@ config_init_cluster() {
   read -p "  description: " user_input["cluster_desc"]
   
   echo
-  fmt_echo "Hive needs to know a Swarm manager hostname or address belonging to this cluster to interact with services and nodes; more managers can be added or autodiscovered later"
+  fmt_echo "Hive needs to know a Swarm manager hostname or address belonging to this cluster to interact with services and nodes; more managers can be added or autodiscovered later."
   echo
   fmt_echo "Set a manager hostname or address"
-  read -p "  manager: " user_input["cluster_manager"]
+  local _cluster_manager_valid=0
+  while [[ $_cluster_manager_valid -eq 0 ]]; do
+    read -p "  manager: " user_input["cluster_manager"]
+    if [[ -n "$(validate_cluster_host "${user_input["cluster_manager"]}")" ]]; then
+      echo "error: provided hostname is not a valid DNS hostname or IP address"
+    else
+      _cluster_manager_valid=1
+    fi
+  done
   ## CLUSTER TIME BAYBEEEE
   initialize_cluster_context "${user_input["cluster_name"]}" "${user_input["cluster_desc"]}" "${user_input["cluster_manager"]}"
   echo
+  fmt_echo "Your first cluster \"${CURRENT_CLUSTER[name]}\" has been saved! More clusters can be added later with 'hive config cluster add'."
+  echo
+  fmt_echo "When you have multiple clusters, you can switch between them with"
+  fmt_echo "'hive config cluster use [cluster_name]'."
+  echo -e '\n==='
   :
 }
 
 config_init_ssh() {
-  fmt_echo "Hive can handle some ssh quality-of-life configurations like managing Swarm node ssh access credentials, controlling host_keys, and autoconfiguring multiplexing; reasonable defaults are provided for all configuration options"
+  sec_head "Configure SSH settings!"
+  echo
+  fmt_echo "Hive can handle some SSH quality-of-life configurations like managing Swarm node SSH access credentials, controlling host_keys, and autoconfiguring multiplexing; reasonable defaults are provided for all configuration options."
   echo
   local _ssh_conf_manage
   _ssh_conf_manage="$(config_get ssh_config_manage)"
@@ -61,7 +87,7 @@ config_init_ssh() {
     local _ssh_mg_enable=0
     config_set ssh_config_manage "false"
   fi
-  read -p "  enable ssh config management? [$def_ssh_mg]: " user_input["ssh_config_manage"]
+  read -p "  enable SSH config management? [$def_ssh_mg]: " user_input["ssh_config_manage"]
   if [[ ! "${user_input["ssh_config_manage"]// }" ]]; then
     user_input["ssh_config_manage"]="$(config_get ssh_config_manage)"
   else
@@ -71,31 +97,50 @@ config_init_ssh() {
   if [[ "${user_input[ssh_config_manage],,}" =~ ^(y|yes|true|1)$ ]]; then
     fmt_echo "Tune SSH settings!"
     echo
-    fmt_echo "Hive communicates with Docker nodes using ssh with private-key authentication; the provided ssh user must be present on all docker systems in the Swarm cluster, and the user must have access to each node's local docker socket"
+    fmt_echo "Hive communicates with Docker nodes using SSH with private-key authentication; the provided SSH user must be present on all docker systems in the Swarm cluster, and the user must have access to each node's local docker socket."
     echo
     fmt_echo "SSH credential settings"
-    read -p "  ssh user [$USER]: " user_input["ssh_user"]
+    read -p "  SSH user [$USER]: " user_input["ssh_user"]
     if [[ ! "${user_input["ssh_user"]// }" ]]; then
       user_input["ssh_user"]="$(config_get ssh_credential_user)"
     else
       config_set ssh_credential_user "${user_input["ssh_user"]}"
     fi
     
-    read -p "  ssh private key (default ssh client key search behavior if left blank): " user_input["ssh_identity"]
-    if [[ ! "${user_input["ssh_identity"]// }" ]]; then
-      user_input["ssh_identity"]="$(config_get ssh_credential_identity_file)"
+    local _ssh_key_path="$(config_get ssh_credential_identity_file)"
+    local _ssh_key_prefill
+    if [[ "${_ssh_key_path// }" ]]; then
+      _ssh_key_prefill="[$_ssh_key_path]"
     else
-      [[ -n "$(validate_file_exists "${user_input["ssh_identity"]}")" ]] && echo "ERROR: ssh private key path not found" && false
-      config_set ssh_credential_identity_file "${user_input["ssh_identity"]}"
+      _ssh_key_prefill="(must not be left blank)"
     fi
+    local _ssh_key_read=0
+    while [[ $_ssh_key_read -eq 0 ]]; do
+      read -e -p "  SSH private key path $_ssh_key_prefill: " user_input["ssh_identity"]
+      if [[ ! "${user_input["ssh_identity"]// }" ]]; then
+        if [[ ! "${_ssh_key_path// }" ]]; then
+          fmt_echo "error: SSH key path must not be blank"
+        else
+          user_input["ssh_identity"]="$(config_get ssh_credential_identity_file)"
+          [[ -n "$(validate_file_exists "${user_input["ssh_identity"]}")" ]] && echo "ERROR: provided ssh private key path not found" && false
+          _ssh_key_read=1
+        fi
+      else
+        [[ -n "$(validate_file_exists "${user_input["ssh_identity"]}")" ]] && echo "ERROR: provided ssh private key path not found" && false
+        config_set ssh_credential_identity_file "${user_input["ssh_identity"]}"
+        _ssh_key_read=1
+      fi
+    done
     fmt_echo "SSH config settings"
     local _ssh_conf_path
     _ssh_conf_path="$(config_get ssh_config_file)"
     [[ ! "${_ssh_conf_path// }" ]] && _ssh_conf_path="$HOME/.ssh/config"
-    read -p "  ssh config path [$_ssh_conf_path]: " user_input["ssh_config"]
+    read -e -p "  ssh config path [$_ssh_conf_path]: " user_input["ssh_config"]
     if [[ ! "${user_input["ssh_config"]// }" ]]; then
       user_input["ssh_config"]="$_ssh_conf_path"
+      [[ -n "$(validate_file_exists "${user_input["ssh_config"]}")" ]] && echo "ERROR: ssh config file path not found" && false
     else
+      [[ -n "$(validate_file_exists "${user_input["ssh_config"]}")" ]] && echo "ERROR: ssh config file path not found" && false
       config_set ssh_config_file "${user_input["ssh_config"]}"
     fi
     
@@ -116,32 +161,50 @@ config_init_ssh() {
     fi
     echo
     if [[ "${user_input["ssh_multiplex_enable"]// }" =~ ^(n|no|false|0|[[:space:]]*)$ ]]; then
-      fmt_echo "Skipping SSH multiplex configuration. You can enable and configure it later with 'hive config ssh multiplex enable' and 'hive config ssh multiplex update'"
+      fmt_echo "Skipping SSH multiplex configuration. You can enable and configure it later with 'hive config ssh multiplex enable' and 'hive config ssh multiplex update'."
     else
-      fmt_echo "SSH multiplexing behavior can be fine tuned; for more information see \`man ssh_config\`"
-      fmt_echo "Even if you disabled multiplexing in the last step, these settings will be saved for later"
+      fmt_echo "SSH multiplexing behavior can be fine tuned; for more information see 'man ssh_config'."
+      fmt_echo "Even if you disabled multiplexing in the last step, these settings will be saved for later."
       echo
       fmt_echo "SSH multiplex settings"
       # TODO: handle these and insert
-      read -p "  ssh multiplex ControlPath [$(config_get ssh_multiplex_controlpath)]: " user_input["ssh_controlpath"]
-      read -p "  ssh multiplex ControlPersist [$(config_get ssh_multiplex_controlpersist)]: " user_input["ssh_controlpersist"]
-      read -p "  ssh multiplex ServerAliveInterval [$(config_get ssh_multiplex_serveraliveinterval)]: " user_input["ssh_aliveinterval"]
+      read -p "  ssh multiplex ControlPath [$(config_get ssh_multiplex_controlpath)]: " user_input["ssh_multiplex_controlpath"]
+      if [[ ! "${user_input["ssh_multiplex_controlpath"]// }" ]]; then
+        user_input["ssh_multiplex_controlpath"]="$(config_get ssh_multiplex_controlpath)"
+      else
+        config_set ssh_multiplex_controlpath "${user_input["ssh_multiplex_controlpath"]}"
+      fi
+      read -p "  ssh multiplex ControlPersist [$(config_get ssh_multiplex_controlpersist)]: " user_input["ssh_multiplex_controlpersist"]
+      if [[ ! "${user_input["ssh_multiplex_controlpersist"]// }" ]]; then
+        user_input["ssh_multiplex_controlpersist"]="$(config_get ssh_multiplex_controlpersist)"
+      else
+        config_set ssh_multiplex_controlpersist "${user_input["ssh_multiplex_controlpersist"]}"
+      fi
+      read -p "  ssh multiplex ServerAliveInterval [$(config_get ssh_multiplex_serveraliveinterval)]: " user_input["ssh_multiplex_aliveinterval"]
+      if [[ ! "${user_input["ssh_multiplex_aliveinterval"]// }" ]]; then
+        user_input["ssh_multiplex_aliveinterval"]="$(config_get ssh_multiplex_serveraliveinterval)"
+      else
+        config_set ssh_multiplex_serveraliveinterval "${user_input["ssh_multiplex_aliveinterval"]}"
+      fi
     fi
     echo
-    fmt_echo "SSH host_keys can be automatically imported and pruned from discovered cluster nodes, useful if nodes are recreated during system upgrades or if there are too many nodes to manually accept hostkeys for"
+    fmt_echo "SSH host_keys can be automatically imported and pruned from discovered cluster nodes, useful if nodes are recreated during system upgrades or if there are too many nodes to manually accept hostkeys for."
     echo
-    fmt_echo "Hive will maintain a separate SSH host_keys file from the user default to facilitate cluster host-key management"
+    fmt_echo "Hive will maintain a separate SSH host_keys file from the user default to facilitate cluster host-key management."
     echo
     fmt_echo "SSH host_keys settings"
     local _ssh_keyfile
     _ssh_keyfile="$(config_get ssh_keyfile_path)"
     if [[ ! "${_ssh_keyfile// }" ]]; then
-      _ssh_keyfile="$HOME/.ssh/_hive_known_hosts"
+      _ssh_keyfile="$(dirname "${user_input["ssh_config"]}")/hive_known_hosts"
       config_set ssh_keyfile_path "$_ssh_keyfile"
     fi
     read -p "  ssh custom KeyFile path [$_ssh_keyfile]: " user_input["ssh_keyfile"]
     if [[ "${user_input["ssh_keyfile"]// }" ]]; then 
+      [[ -n "$(validate_dir_exists "$(dirname "${user_input["ssh_keyfile"]}")")" ]] && echo "ERROR: ssh KeyFile parent dir path not found" && false
       config_set ssh_keyfile_path "${user_input["ssh_keyfile"]}"
+    else
+      user_input["ssh_keyfile"]="$(config_get ssh_keyfile_path)"
     fi
     
     local _ssh_hsk_enabled
@@ -167,7 +230,8 @@ config_init_ssh() {
     echo
     fmt_echo "The following SSH configurations will be applied based on your selections:"
     echo
-    local hive_ssh_config_file="${user_input["ssh_config"]}_hive"
+    local hive_ssh_config_file
+    hive_ssh_config_file="$(dirname "${user_input["ssh_config"]}")/hive_ssh_config"
     echo "# The file $hive_ssh_config_file will be created"
     echo "# with the following content:"
     echo
@@ -201,7 +265,7 @@ config_init_ssh() {
     
     echo
     echo
-    local hive_include="Include \"$hive_ssh_config\""
+    local hive_include="Include ./hive_ssh_config"
     local base_config_content
     base_config_content="$(grep -v "$hive_include" "$(config_get ssh_config_file)")"
     echo "# Hive will write the following"
@@ -228,16 +292,26 @@ config_init_ssh() {
     #tee "$(config_get ssh_config_file)" <<< "$ssh_config_content"
     cat <<< "$ssh_config_content"
   else
-    fmt_echo "By disabling ssh config management you will be responsible for defining all required ssh_config entries for ssh access from this machine to the Hive-managed Swarm nodes"
+    fmt_echo "By disabling SSH config management you will be responsible for maintaining SSH access configs to the Hive-managed Swarm nodes."
   fi
-  echo
+  echo -e '\n==='
 }
 
 config_init_prompt() {
-  fmt_echo "Define your prompt injection!"
+  sec_head "Keep track of your active cluster!"
   echo
-  fmt_echo "Hive can inject a template into your PS1 prompt to show which cluster you are actively managing. This prompt is customizable using a templating system. See \`hive config prompt update --help\` for template syntax information"
-  :
+  fmt_echo "Hive provides helper commands to inject a current-cluster label into your PS1 prompt."
+  echo
+  fmt_echo "Hive cannot directly manage unexported shell variables like PS1. You can manually toggle prompt injection by passing command output to 'eval'."
+  echo
+  fmt_echo "To enable:"
+  echo "  eval \"\$(hive config prompt enable)\""
+  echo
+  fmt_echo "To disable:"
+  echo "  eval \"\$(hive config prompt disable)\""
+  echo
+  fmt_echo "If you'd rather manage PS1 yourself, you can print current cluster data with 'hive config cluster show'"
+  echo
 }
 
 #clear
