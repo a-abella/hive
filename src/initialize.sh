@@ -23,3 +23,7 @@ for i in "${!settings_locs[@]}"; do
     break
   fi
 done
+
+## VIMRUNTIME resolution for vim less.sh
+# shellcheck disable=SC2016,SC2034
+VIMRUNTIME="$(vim -e -T dumb --cmd 'exe "set t_cm=\<C-M>"|echo $VIMRUNTIME|quit' | tr -d '\015' )"

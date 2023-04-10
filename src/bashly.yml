@@ -2,7 +2,7 @@ name: hive
 help: A single-pane toolbox for Docker Swarm clusters
 version: 0.0.1
 
-dependencies: [docker, jq, ssh]
+dependencies: [docker, jq, ssh, vim]
 
 environment_variables:
 - name: DEBUG
