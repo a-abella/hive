@@ -28,7 +28,7 @@ sec_head() {
 }
 
 initialize_cluster_context() {
-  local j="{\"$1\": {\"desc\": \"$2\", \"managers\": [\"$3\"]}}"
+  local j="{\"$1\": {\"description\": \"$2\", \"managers\": [\"$3\"]}}"
   config_set cluster_map "$j"
   config_set cluster_current "$1"
   load_hive_cluster

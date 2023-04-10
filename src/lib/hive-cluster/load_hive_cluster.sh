@@ -9,7 +9,7 @@ load_hive_cluster() {
       if current_cluster_json="$( jq -e ".\"$current_cluster_name\"" <<< "$cluster_map" )"; then
         local current_cluster_parts=()
         current_cluster_parts+=( "$current_cluster_name" )
-        current_cluster_parts+=( "$( jq -re '.desc' <<< "$current_cluster_json")" )
+        current_cluster_parts+=( "$( jq -re '.description' <<< "$current_cluster_json")" )
         current_cluster_parts+=( "$( jq -re '.managers[]' <<< "$current_cluster_json")" )
         local cluster_part_names=( name desc mgrs )
         local idx=0
