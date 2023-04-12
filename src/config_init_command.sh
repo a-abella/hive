@@ -28,8 +28,10 @@ sec_head() {
 }
 
 initialize_cluster_context() {
-  local j="{\"$1\": {\"description\": \"$2\", \"managers\": [\"$3\"]}}"
-  config_set cluster_map "$j"
+  # local j="{\"$1\": {\"description\": \"$2\", \"managers\": [\"$3\"]}}"
+  local this_j
+  this_j="$(cluster_build "$1" "$2" "$3" "$4")"
+  config_set cluster_map "$(cluster_merge "$this_j")"
   config_set cluster_current "$1"
   load_hive_cluster
   dbg_echo "INITIALIZED AND LOADED CLUSTER DATA"
@@ -236,7 +238,7 @@ config_init_ssh() {
     echo "# with the following content:"
     echo
 
-    local ssh_config_hive_printf_b64="SG9zdCAlcwogICMgdGhlIHVzZXIgdXNlZCB0byBzc2ggdG8gc3dhcm0gbm9kZXMKICBVc2VyICVzCiAgIyBwcml2YXRlIGtleSBmb3IgdGhlIGdpdmVuIHVzZXIKICBJZGVudGl0eUZpbGUgJXMKICAjIGVuYWJsZSBtdWx0aXBsZXhpbmcgKHllc3xhdXRvID0gZW5hYmxlZCwgbm8gPSBkaXNhYmxlZCkKICBDb250cm9sTWFzdGVyICVzCiAgIyBsb2NhdGlvbiBhbmQgdGVtcGxhdGUgZm9yIG11bHRpcGxleGluZyBzc2ggc29ja2V0cwogIENvbnRyb2xQYXRoICVzCiAgIyBkdXJhdGlvbiB0byByZXRhaW4gb3BlbiBzb2NrZXRzCiAgQ29udHJvbFBlcnNpc3QgJXMKICAjIGludGVydmFsIHRvIHNlbmQga2VlcGFsaXZlIHNpZ25hbHMKICBTZXJ2ZXJBbGl2ZUludGVydmFsICVzCiAgIyB3aGVyZSB0byBzdG9yZSBoaXZlLW1hbmFnZWQgaG9zdGtleXMKICBVc2VLbm93bkhvc3RzRmlsZSAlcwogICMgY29udHJvbCBob3N0a2V5IGhhc2hpbmcKICBIYXNoS25vd25Ib3N0cyAlcwoK"
+    local ssh_config_hive_printf_b64="SG9zdCAlcwogICMgdGhlIHVzZXIgdXNlZCB0byBzc2ggdG8gc3dhcm0gbm9kZXMKICBVc2VyICVzCiAgIyBwcml2YXRlIGtleSBmb3IgdGhlIGdpdmVuIHVzZXIKICBJZGVudGl0eUZpbGUgJXMKICAjIGVuYWJsZSBtdWx0aXBsZXhpbmcgKHllc3xhdXRvID0gZW5hYmxlZCwgbm8gPSBkaXNhYmxlZCkKICBDb250cm9sTWFzdGVyICVzCiAgIyBsb2NhdGlvbiBhbmQgdGVtcGxhdGUgZm9yIG11bHRpcGxleGluZyBzc2ggc29ja2V0cwogIENvbnRyb2xQYXRoICVzCiAgIyBkdXJhdGlvbiB0byByZXRhaW4gb3BlbiBzb2NrZXRzCiAgQ29udHJvbFBlcnNpc3QgJXMKICAjIGludGVydmFsIHRvIHNlbmQga2VlcGFsaXZlIHNpZ25hbHMKICBTZXJ2ZXJBbGl2ZUludGVydmFsICVzCiAgIyB3aGVyZSB0byBzdG9yZSBoaXZlLW1hbmFnZWQgaG9zdGtleXMKICBVc2VyS25vd25Ib3N0c0ZpbGUgJXMKICAjIGNvbnRyb2wgaG9zdGtleSBoYXNoaW5nCiAgSGFzaEtub3duSG9zdHMgJXMKCg=="
     ## ssh_config_give_printf_b64 resolves to a printf string that will ultimately resembe the following:
     ## have to use base64+printf because bashly's handling of heredocs is broken
     ##
@@ -258,9 +260,11 @@ config_init_ssh() {
     ##   # control hostkey hashing
     ##   HashKnownHosts ${user_input["ssh_hashknownhosts"]}
     
+    local host_list
+    host_list="$(cluster_hosts "$(config_get cluster_current)")"
     # shellcheck disable=SC2059
-    printf "$(base64 -d <<< "$ssh_config_hive_printf_b64")" "${user_input["cluster_manager"]}" "${user_input["ssh_user"]}" "${user_input["ssh_identity"]}" "$([[ "${user_input["ssh_multiplex_enable"],,}" =~ ^(y|yes|true|1)$ ]] && echo Auto || echo no)" "${user_input["ssh_multiplex_controlpath"]}" "${user_input["ssh_multiplex_controlpersist"]}" "${user_input["ssh_multiplex_aliveinterval"]}" "${user_input["ssh_keyfile"]}" "${user_input["ssh_hashknownhosts"]}" \
-      | cat
+    printf "$(base64 -d <<< "$ssh_config_hive_printf_b64")" "$host_list" "${user_input["ssh_user"]}" "${user_input["ssh_identity"]}" "$([[ "${user_input["ssh_multiplex_enable"],,}" =~ ^(y|yes|true|1)$ ]] && echo Auto || echo no)" "${user_input["ssh_multiplex_controlpath"]}" "${user_input["ssh_multiplex_controlpersist"]}" "${user_input["ssh_multiplex_aliveinterval"]}" "${user_input["ssh_keyfile"]}" "${user_input["ssh_hashknownhosts"]}" \
+      > "$hive_ssh_config_file"
       #| tee "$hive_ssh_config_file"  #FINDME
     
     echo
@@ -290,7 +294,7 @@ config_init_ssh() {
     fi
     # FINDME
     #tee "$(config_get ssh_config_file)" <<< "$ssh_config_content"
-    cat <<< "$ssh_config_content"
+    echo "$ssh_config_content" > "$(config_get ssh_config_file)"
   else
     fmt_echo "By disabling SSH config management you will be responsible for maintaining SSH access configs to the Hive-managed Swarm nodes."
   fi
