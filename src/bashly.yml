@@ -78,7 +78,7 @@ commands:
         short: -f
         arg: FIELD
         allowed: [all, name, description, managers]
-        default: name   
+        default: all   
     - name: rm
       help: Remove a cluster from hive management
       footer: Removing the current cluster will implicitly call 'hive disconnect' before removal
