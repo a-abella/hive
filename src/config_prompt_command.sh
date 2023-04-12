@@ -5,9 +5,10 @@
 
 case "${args[TOGGLE]}" in
   enable)
-    echo "export HIVE_OLD_PS1=\"\$PS1\"; PS1=\"(\$($(realpath -s "$0") config cluster show -f name)) \$PS1\""
+    echo "export HIVE_OLD_PS1=\"\$PS1\"; PS1=\"(hive|\$($(realpath -s "$0") config cluster show -f name)) \$PS1\""
   ;;
   disable)
     echo "PS1=\"\$HIVE_OLD_PS1\"; unset HIVE_OLD_PS1"
   ;;
 esac
+echo "# embed this command in 'eval', like 'eval \$(hive config prompt enable|disable)'"
